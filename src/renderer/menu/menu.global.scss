@@ -1,0 +1,40 @@
+.home-menu-icon {
+  cursor: pointer;
+  background-color: burlywood;
+  color: white;
+  padding: 20px;
+  border-radius: 50px;
+  overflow: visible;
+}
+
+.home-menu {
+  left: 15px;
+  top: 15px;
+  position: fixed;
+  z-index: 15;
+  span {
+    font-size: 25px;
+    display: flex;
+    align-items: center;
+    margin: 10px 0px 0px 0px;
+    border: 1px solid lightgray;
+    border-radius: 5px;
+    padding: 5px 20px;
+    width: 200px;
+    height: 40px;
+    box-shadow: 0px 2px 4px 0px lightgrey;
+    cursor: pointer;
+    user-select: none;
+    background-color: white;
+    &:hover {
+      background-color: cornsilk;
+    }
+  }
+}
+
+.add-menu {
+  margin-left: 50px;
+  span {
+    width: 150px;
+  }
+}

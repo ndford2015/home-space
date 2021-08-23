@@ -1,0 +1,104 @@
+@import '/node_modules/react-grid-layout/css/styles.css';
+@import '/node_modules/react-resizable/css/styles.css';
+
+.notepad-container {
+  height: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  & > div:nth-child(1) {
+    flex: 1 1 auto;
+  }
+  & > div:nth-child(2) {
+    flex: 100 1 auto;
+    overflow-y: auto;
+    background-color: papayawhip;
+    .DraftEditor-root {
+      height: 100%;
+    }
+  }
+}
+
+.draggable-container {
+  box-shadow: 0px 2px 18px 0px lightgrey;
+  .react-resizable-handle {
+    z-index: 10;
+  }
+}
+
+.drag-handle {
+  left: 10px;
+  top: 10px;
+  &:hover {
+    cursor: grab;
+  }
+  flex: 2 1 auto;
+  height: 20px;
+  font-size: 20px;
+  text-align: left;
+  pointer-events: auto;
+  padding-left: 10px;
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.item-header {
+  width: calc(100% - 2px);
+  border: 1px solid lightgray;
+  height: 40px;
+  text-align: center;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  pointer-events: none;
+  &:hover {
+    background-color: mistyrose;
+  }
+  &:active {
+    background-color: mistyrose;
+  }
+  span {
+    border: none;
+    height: 30px;
+    font-size: 25px;
+    width: fit-content;
+    background: transparent;
+    outline: none;
+    pointer-events: auto;
+    flex: 2 2 auto;
+    text-align: left;
+    max-width: 80%;
+    min-width: 20px;
+    overflow-x: auto;
+    white-space: nowrap;
+    &:hover {
+      cursor: text;
+    }
+    &:empty::after {
+      content: attr(data-placeholder);
+      color: lightgray;
+      display: inline-block;
+    }
+    &:focus:empty {
+      content: none;
+    }
+  }
+}
+
+.remove-item-button {
+  right: 10px;
+  top: 10px;
+  height: 20px;
+  width: 30px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+body,
+html,
+#root {
+  height: 100%;
+  font-family: 'Courier New', Courier, monospace;
+}
