@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MemoryRouter as Router, Switch, Route } from 'react-router-dom';
 import GridLayout, { Layout, WidthProvider } from 'react-grid-layout';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,6 +28,12 @@ const HomeSpace = () => {
         return '';
     }
   };
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on('defaultDir', (val) => {
+      console.log('val', val);
+    });
+  }, []);
 
   const addItem = (type: ItemType) => {
     const id: string = uuidv4();

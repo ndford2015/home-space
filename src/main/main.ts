@@ -11,10 +11,11 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import sqlite from 'sqlite3';
+import { existsSync, mkdirSync } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
@@ -27,23 +28,9 @@ export default class AppUpdater {
 }
 
 const sqlite3 = sqlite.verbose();
-const db = new sqlite3.Database(':memory:');
-
-db.serialize(() => {
-  db.run('CREATE TABLE lorem (info TEXT)');
-
-  const stmt = db.prepare('INSERT INTO lorem VALUES (?)');
-  for (let i = 0; i < 10; i += 1) {
-    stmt.run(`Ipsum ${i}`);
-  }
-  stmt.finalize();
-
-  db.each('SELECT rowid AS id, info FROM lorem', (_err, row) => {
-    console.log(`${row.id}: ${row.info}`);
-  });
-});
-
-db.close();
+const db = new sqlite3.Database(
+  path.resolve(app.getPath('userData'), 'homespace.db')
+);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -108,7 +95,7 @@ const createWindow = async () => {
 
   // @TODO: Use 'ready-to-show' event
   //        https://github.com/electron/electron/blob/main/docs/api/browser-window.md#using-ready-to-show-event
-  mainWindow.webContents.on('did-finish-load', () => {
+  mainWindow.webContents.on('did-finish-load', async () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
     }
@@ -117,6 +104,65 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
+      let defaultDir = '';
+      const dbPromise = new Promise((resolve, reject) => {
+        db.serialize(async () => {
+          console.log('running db scripts');
+          db.run('CREATE TABLE if not exists settings (id TEXT, value TEXT)');
+          const defaultDirSql = 'select value from settings where id = ?';
+          const defaultDirId = 'defaultDir';
+          // eslint-disable-next-line promise/param-names
+          const getDefaultDir = new Promise((res, rej) => {
+            db.get(defaultDirSql, [defaultDirId], (err, row) => {
+              if (err) {
+                rej(err.message);
+              }
+              if (row) {
+                defaultDir = row.value;
+                console.log('default dir: ', defaultDir);
+                res(true);
+              }
+              res(true);
+            });
+          });
+          await getDefaultDir;
+
+          if (!defaultDir && mainWindow) {
+            console.log('sending main window');
+            // return mainWindow.webContents.send('defaultDir', '');
+            const selectedDir = await dialog.showOpenDialog(mainWindow, {
+              properties: ['openDirectory'],
+            });
+            const homeSpaceDir = selectedDir.filePaths.length
+              ? `${selectedDir.filePaths[0]}/homespace`
+              : `${app.getPath('home')}/homespace`;
+            console.log('selected dir: ', homeSpaceDir);
+            db.run(
+              `INSERT INTO settings(id, value) VALUES(?, ?)`,
+              ['defaultDir', homeSpaceDir],
+              (insErr) => {
+                if (insErr) {
+                  reject(insErr.message);
+                }
+                if (!existsSync(homeSpaceDir)) {
+                  mkdirSync(homeSpaceDir);
+                }
+                defaultDir = homeSpaceDir;
+                resolve(homeSpaceDir);
+              }
+            );
+          } else {
+            resolve(true);
+          }
+        });
+      });
+      await dbPromise;
+      db.close();
+      const date: string = new Date().toISOString().split('T')[0];
+      const todayDir = `${defaultDir}/${date}`;
+      if (!existsSync(todayDir)) {
+        mkdirSync(todayDir);
+      }
     }
   });
 
@@ -132,6 +178,8 @@ const createWindow = async () => {
     event.preventDefault();
     shell.openExternal(url);
   });
+
+  console.log('user path: ', app.getPath('userData'));
 
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
