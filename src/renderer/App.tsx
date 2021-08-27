@@ -55,10 +55,14 @@ const HomeSpace = () => {
     });
   };
 
-  const getItemByType = (type: ItemType): JSX.Element | null => {
+  const saveNote = (name: string, val: string) => {
+    window.electron.ipcRenderer.send('noteUpdate', { name, val });
+  };
+
+  const getItemByType = (type: ItemType, name: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
-        return <Note />;
+        return <Note onChange={(val: string) => saveNote(name, val)} />;
       default:
         return null;
     }
@@ -99,8 +103,8 @@ const HomeSpace = () => {
 
   const getItems = (): JSX.Element[] => {
     return layout.map((item) => {
-      const { type } = itemMeta[item.i];
-      const itemUi: JSX.Element | null = getItemByType(type);
+      const { type, name } = itemMeta[item.i];
+      const itemUi: JSX.Element | null = getItemByType(type, name);
       if (!itemUi) {
         return <></>;
       }

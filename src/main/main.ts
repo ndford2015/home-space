@@ -26,7 +26,7 @@ export default class AppUpdater {
     autoUpdater.checkForUpdatesAndNotify();
   }
 }
-
+let todayDir = '';
 const sqlite3 = sqlite.verbose();
 const db = new sqlite3.Database(
   path.resolve(app.getPath('userData'), 'homespace.db')
@@ -34,10 +34,8 @@ const db = new sqlite3.Database(
 
 let mainWindow: BrowserWindow | null = null;
 
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
+ipcMain.on('noteUpdate', async (event, arg) => {
+  console.log('note update: ', arg);
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -159,7 +157,7 @@ const createWindow = async () => {
       await dbPromise;
       db.close();
       const date: string = new Date().toISOString().split('T')[0];
-      const todayDir = `${defaultDir}/${date}`;
+      todayDir = `${defaultDir}/${date}`;
       if (!existsSync(todayDir)) {
         mkdirSync(todayDir);
       }
