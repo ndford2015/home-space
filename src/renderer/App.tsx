@@ -55,14 +55,22 @@ const HomeSpace = () => {
     });
   };
 
-  const saveNote = (name: string, val: string) => {
+  const setItemName = (name: string, id: string) => {
+    setItemMeta({
+      ...itemMeta,
+      [id]: { ...itemMeta[id], name },
+    });
+  };
+
+  const saveNote = (id: string, val: string) => {
+    const { name } = itemMeta[id];
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
-  const getItemByType = (type: ItemType, name: string): JSX.Element | null => {
+  const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
-        return <Note onChange={(val: string) => saveNote(name, val)} />;
+        return <Note onChange={(val: string) => saveNote(id, val)} />;
       default:
         return null;
     }
@@ -75,7 +83,7 @@ const HomeSpace = () => {
     setItemMeta(updatedTypes);
   };
 
-  const getItemHeader = (meta: ItemMeta, id: string): JSX.Element => {
+  const getItemHeader = (id: string): JSX.Element => {
     return (
       <div className="item-header">
         <div className="drag-handle">
@@ -84,15 +92,8 @@ const HomeSpace = () => {
         <span
           contentEditable
           data-placeholder="Enter name here"
-          onChange={(evt) =>
-            setItemMeta({
-              ...itemMeta,
-              [id]: { ...itemMeta[id], name: evt.currentTarget.innerHTML },
-            })
-          }
-        >
-          {meta.name}
-        </span>
+          onInput={(evt) => setItemName(evt.currentTarget.innerText, id)}
+        />
         <FaTimes
           onClick={() => removeItem(id)}
           className="remove-item-button"
@@ -103,14 +104,14 @@ const HomeSpace = () => {
 
   const getItems = (): JSX.Element[] => {
     return layout.map((item) => {
-      const { type, name } = itemMeta[item.i];
-      const itemUi: JSX.Element | null = getItemByType(type, name);
+      const { type } = itemMeta[item.i];
+      const itemUi: JSX.Element | null = getItemByType(type, item.i);
       if (!itemUi) {
         return <></>;
       }
       return (
         <div key={item.i} className="draggable-container">
-          {getItemHeader(itemMeta[item.i], item.i)}
+          {getItemHeader(item.i)}
           {itemUi}
         </div>
       );

@@ -15,7 +15,7 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import sqlite from 'sqlite3';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFile } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
@@ -35,7 +35,12 @@ const db = new sqlite3.Database(
 let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('noteUpdate', async (event, arg) => {
-  console.log('note update: ', arg);
+  console.log('note name: ', arg.name);
+  const filepath = `${todayDir}/${arg.name}.md`;
+  writeFile(filepath, arg.val, (err) => {
+    if (err) throw err;
+    console.log('The file has been saved!');
+  });
 });
 
 if (process.env.NODE_ENV === 'production') {
