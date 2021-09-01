@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MemoryRouter as Router, Switch, Route } from 'react-router-dom';
 import GridLayout, { Layout, WidthProvider } from 'react-grid-layout';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +7,7 @@ import Menu from './menu/menu';
 import './App.global.scss';
 import { ItemType } from './constants';
 import Note from './home-items/note';
+import { debounce } from './utils';
 
 interface ItemMeta {
   readonly type: ItemType;
@@ -35,17 +36,27 @@ const HomeSpace = () => {
     });
   }, []);
 
+  const getXVal = () => {
+    if (!layout.length) {
+      return 1;
+    }
+    const prev = layout[layout.length - 1];
+    const prevRight = prev.x + prev.w;
+
+    return prevRight > 8 ? 0 : prevRight;
+  };
+
   const addItem = (type: ItemType) => {
     const id: string = uuidv4();
     setLayout([
       ...layout,
       {
         i: id,
-        minW: 5,
+        minW: 4,
         minH: 5,
-        w: 5,
+        w: 4,
         h: 8,
-        x: (layout.length % 2) * 5,
+        x: getXVal(),
         y: Infinity,
       },
     ]);
@@ -55,12 +66,19 @@ const HomeSpace = () => {
     });
   };
 
-  const setItemName = (name: string, id: string) => {
+  const setItemName = (newName: string, id: string) => {
+    const prevName = itemMeta[id].name;
+    window.electron.ipcRenderer.send('rename', { prevName, newName });
     setItemMeta({
       ...itemMeta,
-      [id]: { ...itemMeta[id], name },
+      [id]: { ...itemMeta[id], name: newName },
     });
   };
+
+  const debouncedRename = useCallback(
+    debounce((newName: string, id: string) => setItemName(newName, id), 3000),
+    [itemMeta]
+  );
 
   const saveNote = (id: string, val: string) => {
     const { name } = itemMeta[id];
@@ -92,7 +110,7 @@ const HomeSpace = () => {
         <span
           contentEditable
           data-placeholder="Enter name here"
-          onInput={(evt) => setItemName(evt.currentTarget.innerText, id)}
+          onInput={(evt) => debouncedRename(evt.currentTarget.innerText, id)}
         />
         <FaTimes
           onClick={() => removeItem(id)}

@@ -2,6 +2,7 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 import React, { useState, useCallback } from 'react';
 import RichTextEditor from 'react-rte';
+import { debounce } from 'renderer/utils';
 import './item.global.scss';
 
 interface NoteItemProps {
@@ -9,19 +10,14 @@ interface NoteItemProps {
 }
 const Note = (props: NoteItemProps) => {
   const [value, setValue] = useState(RichTextEditor.createEmptyValue());
-  let debounceTimer: NodeJS.Timeout;
-  const onChange = useCallback(
-    (val: any) => {
-      setValue(val);
-      clearTimeout(debounceTimer);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      debounceTimer = setTimeout(
-        () => props.onChange(val.toString('markdown')),
-        3000
-      );
-    },
+  const debouncedOnChange: any = useCallback(
+    debounce((val: any) => props.onChange(val.toString('markdown')), 3000),
     [props]
   );
+  const onChange = (val: any) => {
+    setValue(val);
+    debouncedOnChange(val);
+  };
 
   return (
     <RichTextEditor
