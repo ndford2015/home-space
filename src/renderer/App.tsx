@@ -12,12 +12,13 @@ import { debounce } from './utils';
 interface ItemMeta {
   readonly type: ItemType;
   readonly name: string;
+  readonly data: string;
 }
 
 const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
   WidthProvider(GridLayout);
 
-const HomeSpace = () => {
+const HomeSpace = (props: any) => {
   const [layout, setLayout] = useState<Layout[]>([]);
   const [itemMeta, setItemMeta] = useState<{ [id: string]: ItemMeta }>({});
 
@@ -30,24 +31,23 @@ const HomeSpace = () => {
     }
   };
 
-  useEffect(() => {
-    window.electron.ipcRenderer.on('defaultDir', (val) => {
-      console.log('val', val);
-    });
-  }, []);
-
-  const getXVal = () => {
-    if (!layout.length) {
+  const getXVal = (updatedLayout: Layout[]) => {
+    if (!updatedLayout.length) {
       return 1;
     }
-    const prev = layout[layout.length - 1];
+    const prev = updatedLayout[updatedLayout.length - 1];
     const prevRight = prev.x + prev.w;
 
     return prevRight > 8 ? 0 : prevRight;
   };
 
-  const addItem = (type: ItemType) => {
+  const addItem = (type: ItemType, name?: string, data?: string) => {
     const id: string = uuidv4();
+    setItemMeta({
+      ...itemMeta,
+      [id]: { type, name: name || getNameByType(type), data: data || '' },
+    });
+    console.log('itemMeta in add item: ', itemMeta, type, name, data);
     setLayout([
       ...layout,
       {
@@ -56,15 +56,44 @@ const HomeSpace = () => {
         minH: 5,
         w: 4,
         h: 8,
-        x: getXVal(),
+        x: getXVal(layout),
         y: Infinity,
       },
     ]);
-    setItemMeta({
-      ...itemMeta,
-      [id]: { type, name: getNameByType(type) },
-    });
   };
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'loadHome',
+      (defaultItems: { name: string; data: string }[]) => {
+        if (defaultItems) {
+          const defaultLayout: Layout[] = [];
+          const defaultItemMeta: { [id: string]: ItemMeta } = {};
+          defaultItems.forEach((item) => {
+            const id: string = uuidv4();
+            const { data, name } = item;
+            const nameNoExt = name.replace(/(\..*)$/i, '');
+            defaultItemMeta[id] = {
+              type: ItemType.NOTE,
+              name: nameNoExt,
+              data,
+            };
+            defaultLayout.push({
+              i: id,
+              minW: 4,
+              minH: 5,
+              w: 4,
+              h: 8,
+              x: getXVal(defaultLayout),
+              y: Infinity,
+            });
+          });
+          setItemMeta(defaultItemMeta);
+          setLayout(defaultLayout);
+        }
+      }
+    );
+  });
 
   const setItemName = (newName: string, id: string) => {
     const prevName = itemMeta[id].name;
@@ -75,11 +104,6 @@ const HomeSpace = () => {
     });
   };
 
-  const debouncedRename = useCallback(
-    debounce((newName: string, id: string) => setItemName(newName, id), 3000),
-    [itemMeta]
-  );
-
   const saveNote = (id: string, val: string) => {
     const { name } = itemMeta[id];
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
@@ -88,7 +112,12 @@ const HomeSpace = () => {
   const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
-        return <Note onChange={(val: string) => saveNote(id, val)} />;
+        return (
+          <Note
+            defaultVal={itemMeta[id].data}
+            onChange={(val: string) => saveNote(id, val)}
+          />
+        );
       default:
         return null;
     }
@@ -110,8 +139,10 @@ const HomeSpace = () => {
         <span
           contentEditable
           data-placeholder="Enter name here"
-          onInput={(evt) => debouncedRename(evt.currentTarget.innerText, id)}
-        />
+          onBlur={(evt) => setItemName(evt.currentTarget.innerText, id)}
+        >
+          {itemMeta[id].name}
+        </span>
         <FaTimes
           onClick={() => removeItem(id)}
           className="remove-item-button"
@@ -121,7 +152,12 @@ const HomeSpace = () => {
   };
 
   const getItems = (): JSX.Element[] => {
+    console.log('layout: ', layout);
+    console.log('itemMeta: ', itemMeta);
     return layout.map((item) => {
+      if (!itemMeta[item.i]) {
+        return <div />;
+      }
       const { type } = itemMeta[item.i];
       const itemUi: JSX.Element | null = getItemByType(type, item.i);
       if (!itemUi) {

@@ -15,7 +15,14 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import sqlite from 'sqlite3';
-import { existsSync, mkdirSync, writeFile, rename } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  writeFile,
+  rename,
+  readdirSync,
+  readFileSync,
+} from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
@@ -34,7 +41,7 @@ const db = new sqlite3.Database(
 
 let mainWindow: BrowserWindow | null = null;
 
-ipcMain.on('noteUpdate', (event, arg) => {
+ipcMain.on('noteUpdate', (_event, arg) => {
   console.log('note name: ', arg.name);
   const filepath = `${todayDir}/${arg.name}.md`;
   writeFile(filepath, arg.val, (err) => {
@@ -43,7 +50,7 @@ ipcMain.on('noteUpdate', (event, arg) => {
   });
 });
 
-ipcMain.on('rename', (event, arg) => {
+ipcMain.on('rename', (_event, arg) => {
   const oldPath = `${todayDir}/${arg.prevName}.md`;
   const newPath = `${todayDir}/${arg.newName}.md`;
   if (!existsSync(oldPath)) {
@@ -70,6 +77,20 @@ const isDevelopment =
 if (isDevelopment) {
   require('electron-debug')();
 }
+
+const loadHome = async () => {
+  const fileMeta: { name: string; data: string }[] = [];
+  const files: string[] = readdirSync(todayDir);
+  files.forEach((file) => {
+    const filePath = `${todayDir}/${file}`;
+    const data = readFileSync(filePath);
+    fileMeta.push({ name: file, data: data.toString() });
+  });
+  if (mainWindow) {
+    console.log('fileMeta: ', fileMeta);
+    mainWindow.webContents.send('loadHome', fileMeta);
+  }
+};
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -181,6 +202,8 @@ const createWindow = async () => {
       todayDir = `${defaultDir}/${date}`;
       if (!existsSync(todayDir)) {
         mkdirSync(todayDir);
+      } else {
+        loadHome();
       }
     }
   });
