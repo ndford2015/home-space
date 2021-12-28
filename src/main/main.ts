@@ -35,9 +35,11 @@ export default class AppUpdater {
 }
 let todayDir = '';
 const sqlite3 = sqlite.verbose();
-const db = new sqlite3.Database(
-  path.resolve(app.getPath('userData'), 'homespace.db')
-);
+
+const DEFAULT_DIR_SQL = 'select value from settings where id = ?';
+const DEFAULT_DIR_ID = 'defaultDir';
+const CREATE_SETTINGS_SQL =
+  'CREATE TABLE if not exists settings (id TEXT, value TEXT)';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -121,9 +123,65 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  const sqlCb = (err: Error) => {
+    if (err) {
+      throw err;
+    }
+  };
+
+  const getPathString = (
+    selectedPath: Electron.OpenDialogReturnValue
+  ): string =>
+    selectedPath.filePaths.length
+      ? `${selectedPath.filePaths[0]}/homespace`
+      : `${app.getPath('home')}/homespace`;
+
+  const setHomeDir = async (
+    db: sqlite.Database,
+    resolve: (value: string | PromiseLike<string>) => void
+  ) => {
+    if (!mainWindow) {
+      throw new Error('"mainWindow" is not defined');
+    }
+    // Allow user to select directory for HomeSpace files
+    const selectedDir = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+    });
+    const homeSpaceDir: string = getPathString(selectedDir);
+    // Create setting for user selected home path
+    db.run(`INSERT INTO settings(id, value) VALUES(?, ?)`, [
+      DEFAULT_DIR_ID,
+      homeSpaceDir,
+      sqlCb,
+    ]);
+    if (!existsSync(homeSpaceDir)) {
+      mkdirSync(homeSpaceDir);
+    }
+    resolve(homeSpaceDir);
+  };
+
+  const initializeDefaultDir = (db: sqlite.Database) =>
+    new Promise<string>((resolve) => {
+      db.serialize(async () => {
+        // Create the table to insert user settings if it doesn't exist
+        db.run(CREATE_SETTINGS_SQL, sqlCb);
+        // Get the default directory to store user files if it has been set
+        db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
+          if (err) {
+            throw err;
+          }
+          if (defaultDir) {
+            resolve(defaultDir.value);
+            return;
+          }
+          setHomeDir(db, resolve);
+        });
+      });
+    });
+
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1024,
+    width: 1200,
     height: 728,
     icon: getAssetPath('icon.png'),
     webPreferences: {
@@ -133,8 +191,6 @@ const createWindow = async () => {
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
 
-  // @TODO: Use 'ready-to-show' event
-  //        https://github.com/electron/electron/blob/main/docs/api/browser-window.md#using-ready-to-show-event
   mainWindow.webContents.on('did-finish-load', async () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
@@ -144,66 +200,25 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
-      let defaultDir = '';
-      const dbPromise = new Promise((resolve, reject) => {
-        db.serialize(async () => {
-          console.log('running db scripts');
-          db.run('CREATE TABLE if not exists settings (id TEXT, value TEXT)');
-          const defaultDirSql = 'select value from settings where id = ?';
-          const defaultDirId = 'defaultDir';
-          // eslint-disable-next-line promise/param-names
-          const getDefaultDir = new Promise((res, rej) => {
-            db.get(defaultDirSql, [defaultDirId], (err, row) => {
-              if (err) {
-                rej(err.message);
-              }
-              if (row) {
-                defaultDir = row.value;
-                console.log('default dir: ', defaultDir);
-                res(true);
-              }
-              res(true);
-            });
-          });
-          await getDefaultDir;
-
-          if (!defaultDir && mainWindow) {
-            console.log('sending main window');
-            // return mainWindow.webContents.send('defaultDir', '');
-            const selectedDir = await dialog.showOpenDialog(mainWindow, {
-              properties: ['openDirectory'],
-            });
-            const homeSpaceDir = selectedDir.filePaths.length
-              ? `${selectedDir.filePaths[0]}/homespace`
-              : `${app.getPath('home')}/homespace`;
-            console.log('selected dir: ', homeSpaceDir);
-            db.run(
-              `INSERT INTO settings(id, value) VALUES(?, ?)`,
-              ['defaultDir', homeSpaceDir],
-              (insErr) => {
-                if (insErr) {
-                  reject(insErr.message);
-                }
-                if (!existsSync(homeSpaceDir)) {
-                  mkdirSync(homeSpaceDir);
-                }
-                defaultDir = homeSpaceDir;
-                resolve(homeSpaceDir);
-              }
-            );
-          } else {
-            resolve(true);
-          }
-        });
-      });
-      await dbPromise;
-      db.close();
-      const date: string = new Date().toISOString().split('T')[0];
-      todayDir = `${defaultDir}/${date}`;
-      if (!existsSync(todayDir)) {
-        mkdirSync(todayDir);
-      } else {
-        loadHome();
+      const db = new sqlite3.Database(
+        path.resolve(app.getPath('userData'), 'homespace.db')
+      );
+      try {
+        const defaultDir = await initializeDefaultDir(db);
+        const date: string = new Date().toISOString().split('T')[0];
+        todayDir = `${defaultDir}/${date}`;
+        if (!existsSync(todayDir)) {
+          mkdirSync(todayDir);
+        } else {
+          loadHome();
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (e: any) {
+        if (e.message) {
+          console.error(e.message);
+        }
+      } finally {
+        db.close();
       }
     }
   });
