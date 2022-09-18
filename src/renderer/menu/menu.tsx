@@ -38,22 +38,28 @@ const Menu = (props: MenuProps) => {
       </div>
     );
   };
-
+  // TODO: clean up duplication
   return !open ? (
     <div className="home-menu">
-      <FaBars
-        onClick={() => setOpen(true)}
-        className="home-menu-icon"
-        size={40}
-      />
+      <div className="menu-icon-container">
+        <FaBars
+          onClick={() => setOpen(true)}
+          className="home-menu-icon"
+          size={30}
+        />
+        <h1 color="white">HomeSpace</h1>
+      </div>
     </div>
   ) : (
     <div className="home-menu">
-      <FaTimes
-        onClick={() => setOpen(false)}
-        className="home-menu-icon"
-        size={40}
-      />
+      <div className="menu-icon-container">
+        <FaTimes
+          onClick={() => setOpen(false)}
+          className="home-menu-icon"
+          size={30}
+        />
+        <h1 color="white">HomeSpace</h1>
+      </div>
       {getMenuItems()}
     </div>
   );

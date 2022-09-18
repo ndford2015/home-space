@@ -7,7 +7,6 @@ import Menu from './menu/menu';
 import './App.global.scss';
 import { ItemType } from './constants';
 import Note from './home-items/note';
-import { debounce } from './utils';
 
 interface ItemMeta {
   readonly type: ItemType;
@@ -18,22 +17,13 @@ interface ItemMeta {
 const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
   WidthProvider(GridLayout);
 
-const HomeSpace = (props: any) => {
+const HomeSpace = () => {
   const [layout, setLayout] = useState<Layout[]>([]);
   const [itemMeta, setItemMeta] = useState<{ [id: string]: ItemMeta }>({});
 
-  const getNameByType = (type: ItemType): string => {
-    switch (type) {
-      case ItemType.NOTE:
-        return 'Note';
-      default:
-        return '';
-    }
-  };
-
   const getXVal = (updatedLayout: Layout[]) => {
     if (!updatedLayout.length) {
-      return 1;
+      return 0;
     }
     const prev = updatedLayout[updatedLayout.length - 1];
     const prevRight = prev.x + prev.w;
@@ -45,9 +35,8 @@ const HomeSpace = (props: any) => {
     const id: string = uuidv4();
     setItemMeta({
       ...itemMeta,
-      [id]: { type, name: name || getNameByType(type), data: data || '' },
+      [id]: { type, name: name || '', data: data || '' },
     });
-    console.log('itemMeta in add item: ', itemMeta, type, name, data);
     setLayout([
       ...layout,
       {
@@ -106,6 +95,9 @@ const HomeSpace = (props: any) => {
 
   const saveNote = (id: string, val: string) => {
     const { name } = itemMeta[id];
+    if (!name) {
+      return;
+    }
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
@@ -140,6 +132,7 @@ const HomeSpace = (props: any) => {
           contentEditable
           data-placeholder="Enter name here"
           onBlur={(evt) => setItemName(evt.currentTarget.innerText, id)}
+          suppressContentEditableWarning
         >
           {itemMeta[id].name}
         </span>
@@ -152,8 +145,6 @@ const HomeSpace = (props: any) => {
   };
 
   const getItems = (): JSX.Element[] => {
-    console.log('layout: ', layout);
-    console.log('itemMeta: ', itemMeta);
     return layout.map((item) => {
       if (!itemMeta[item.i]) {
         return <div />;
