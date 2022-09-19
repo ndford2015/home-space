@@ -22,6 +22,7 @@ import {
   rename,
   readdirSync,
   readFileSync,
+  link,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -92,8 +93,10 @@ ipcMain.on('open', () => {
       const fileMeta: { name: string; data: string }[] = [];
       files.filePaths.forEach((filePath) => {
         const data = readFileSync(filePath);
+        const filename: string = filePath.replace(/^.*[\\/]/, '');
+        link(filePath, `${todayDir}/${filename}`, () => {});
         fileMeta.push({
-          name: filePath.replace(/^.*[\\/]/, ''),
+          name: filename,
           data: data.toString(),
         });
       });
