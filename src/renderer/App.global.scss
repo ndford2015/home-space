@@ -66,31 +66,6 @@
   &:active {
     background-color: mistyrose;
   }
-  .keep-open-toggle {
-    pointer-events: auto;
-    span {
-      display: none;
-    }
-    &:hover {
-      cursor: help;
-    }
-    &:hover span {
-      display: flex;
-      position: absolute;
-      font-size: 15px;
-      width: 150px;
-      height: 20px;
-      top: -15px;
-      align-items: center;
-      border: 1px dotted;
-      left: 70px;
-      justify-content: center;
-      background-color: white;
-    }
-    input {
-      pointer-events: auto;
-    }
-  }
   span {
     border: none;
     height: 30px;

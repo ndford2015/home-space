@@ -35,7 +35,9 @@ export default class AppUpdater {
 }
 let todayDir = '';
 const sqlite3 = sqlite.verbose();
-
+const db = new sqlite3.Database(
+  path.resolve(app.getPath('userData'), 'homespace.db')
+);
 const DEFAULT_DIR_SQL = 'select value from settings where id = ?';
 const DEFAULT_DIR_ID = 'defaultDir';
 const CREATE_SETTINGS_SQL =
@@ -66,6 +68,38 @@ ipcMain.on('rename', (_event, arg) => {
       console.log('The file has been renamed to ', newPath);
     });
   }
+});
+
+ipcMain.on('open', () => {
+  console.log('open called');
+  db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
+    if (err) {
+      throw err;
+    }
+    if (!mainWindow) {
+      throw new Error('"mainWindow" is not defined');
+    }
+    const files: Electron.OpenDialogReturnValue = await dialog.showOpenDialog(
+      mainWindow,
+      {
+        defaultPath: defaultDir.value,
+        filters: [{ name: 'Notes', extensions: ['md'] }],
+        properties: ['openFile'],
+      }
+    );
+    if (files.filePaths.length) {
+      // TODO: deduplicate
+      const fileMeta: { name: string; data: string }[] = [];
+      files.filePaths.forEach((filePath) => {
+        const data = readFileSync(filePath);
+        fileMeta.push({
+          name: filePath.replace(/^.*[\\/]/, ''),
+          data: data.toString(),
+        });
+      });
+      mainWindow.webContents.send('openFiles', fileMeta);
+    }
+  });
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -137,7 +171,6 @@ const createWindow = async () => {
       : `${app.getPath('home')}/homespace`;
 
   const setHomeDir = async (
-    db: sqlite.Database,
     resolve: (value: string | PromiseLike<string>) => void
   ) => {
     if (!mainWindow) {
@@ -160,7 +193,7 @@ const createWindow = async () => {
     resolve(homeSpaceDir);
   };
 
-  const initializeDefaultDir = (db: sqlite.Database) =>
+  const initializeDefaultDir = () =>
     new Promise<string>((resolve) => {
       db.serialize(async () => {
         // Create the table to insert user settings if it doesn't exist
@@ -174,7 +207,7 @@ const createWindow = async () => {
             resolve(defaultDir.value);
             return;
           }
-          setHomeDir(db, resolve);
+          setHomeDir(resolve);
         });
       });
     });
@@ -200,11 +233,8 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
-      const db = new sqlite3.Database(
-        path.resolve(app.getPath('userData'), 'homespace.db')
-      );
       try {
-        const defaultDir = await initializeDefaultDir(db);
+        const defaultDir = await initializeDefaultDir();
         const date: string = new Date().toISOString().split('T')[0];
         todayDir = `${defaultDir}/${date}`;
         if (!existsSync(todayDir)) {
@@ -217,8 +247,6 @@ const createWindow = async () => {
         if (e.message) {
           console.error(e.message);
         }
-      } finally {
-        db.close();
       }
     }
   });

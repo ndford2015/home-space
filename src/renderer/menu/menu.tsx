@@ -7,6 +7,7 @@ import './menu.global.scss';
 
 interface MenuProps {
   addItem(type: ItemType): void;
+  openFile(): void;
 }
 
 const Menu = (props: MenuProps) => {
@@ -35,6 +36,7 @@ const Menu = (props: MenuProps) => {
       <div className="menu-container">
         <span onClick={() => setAddMenuOpen(!addMenuOpen)}>Add ...</span>
         {getAddMenu()}
+        <span onClick={props.openFile}>Open</span>
       </div>
     );
   };
@@ -47,7 +49,7 @@ const Menu = (props: MenuProps) => {
           className="home-menu-icon"
           size={30}
         />
-        <h1 color="white">HomeSpace</h1>
+        <h1>HomeSpace</h1>
       </div>
     </div>
   ) : (
@@ -58,7 +60,7 @@ const Menu = (props: MenuProps) => {
           className="home-menu-icon"
           size={30}
         />
-        <h1 color="white">HomeSpace</h1>
+        <h1>HomeSpace</h1>
       </div>
       {getMenuItems()}
     </div>

@@ -84,6 +84,39 @@ const HomeSpace = () => {
     );
   });
 
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'openFiles',
+      (files: { name: string; data: string }[]) => {
+        if (files) {
+          const updatedLayout = layout;
+          const defaultItemMeta: { [id: string]: ItemMeta } = {};
+          files.forEach((item) => {
+            const id: string = uuidv4();
+            const { data, name } = item;
+            const nameNoExt = name.replace(/(\..*)$/i, '');
+            defaultItemMeta[id] = {
+              type: ItemType.NOTE,
+              name: nameNoExt,
+              data,
+            };
+            updatedLayout.push({
+              i: id,
+              minW: 4,
+              minH: 5,
+              w: 4,
+              h: 8,
+              x: getXVal(updatedLayout),
+              y: Infinity,
+            });
+          });
+          setItemMeta(defaultItemMeta);
+          setLayout(updatedLayout);
+        }
+      }
+    );
+  });
+
   const setItemName = (newName: string, id: string) => {
     const prevName = itemMeta[id].name;
     window.electron.ipcRenderer.send('rename', { prevName, newName });
@@ -91,6 +124,11 @@ const HomeSpace = () => {
       ...itemMeta,
       [id]: { ...itemMeta[id], name: newName },
     });
+  };
+
+  const openFile = () => {
+    console.log('open file called');
+    window.electron.ipcRenderer.send('open');
   };
 
   const saveNote = (id: string, val: string) => {
@@ -165,7 +203,7 @@ const HomeSpace = () => {
 
   return (
     <>
-      <Menu addItem={addItem} />
+      <Menu addItem={addItem} openFile={openFile} />
       <ReactGridLayout
         className="layout"
         onLayoutChange={setLayout}
