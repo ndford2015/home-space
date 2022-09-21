@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MemoryRouter as Router, Switch, Route } from 'react-router-dom';
 import GridLayout, { Layout, WidthProvider } from 'react-grid-layout';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,46 +51,80 @@ const HomeSpace = () => {
     ]);
   };
 
+  const loadHome = (defaultItems: { name: string; data: string }[]) => {
+    if (defaultItems) {
+      console.log('default items:', defaultItems);
+      const defaultLayout: Layout[] = [];
+      const defaultItemMeta: { [id: string]: ItemMeta } = {};
+      defaultItems.forEach((item) => {
+        const id: string = uuidv4();
+        const { data, name } = item;
+        const nameNoExt = name.replace(/(\..*)$/i, '');
+        defaultItemMeta[id] = {
+          type: ItemType.NOTE,
+          name: nameNoExt,
+          data,
+        };
+        defaultLayout.push({
+          i: id,
+          minW: 4,
+          minH: 5,
+          w: 4,
+          h: 8,
+          x: getXVal(defaultLayout),
+          y: Infinity,
+        });
+      });
+      setItemMeta(defaultItemMeta);
+      setLayout(defaultLayout);
+    }
+  };
+
   useEffect(() => {
-    window.electron.ipcRenderer.on(
-      'loadHome',
-      (defaultItems: { name: string; data: string }[]) => {
-        if (defaultItems) {
-          const defaultLayout: Layout[] = [];
-          const defaultItemMeta: { [id: string]: ItemMeta } = {};
-          defaultItems.forEach((item) => {
-            const id: string = uuidv4();
-            const { data, name } = item;
-            const nameNoExt = name.replace(/(\..*)$/i, '');
-            defaultItemMeta[id] = {
-              type: ItemType.NOTE,
-              name: nameNoExt,
-              data,
-            };
-            defaultLayout.push({
-              i: id,
-              minW: 4,
-              minH: 5,
-              w: 4,
-              h: 8,
-              x: getXVal(defaultLayout),
-              y: Infinity,
-            });
-          });
-          setItemMeta(defaultItemMeta);
-          setLayout(defaultLayout);
-        }
-      }
-    );
+    window.electron.ipcRenderer.on('loadHome', loadHome);
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('loadHome');
+    };
   });
+
+  const openFiles = (files: { name: string; data: string }[]) => {
+    if (files) {
+      console.log('files: ', files);
+      const updatedLayout = layout;
+      const defaultItemMeta: { [id: string]: ItemMeta } = itemMeta;
+      files.forEach((item) => {
+        const id: string = uuidv4();
+        const { data, name } = item;
+        const nameNoExt = name.replace(/(\..*)$/i, '');
+        defaultItemMeta[id] = {
+          type: ItemType.NOTE,
+          name: nameNoExt,
+          data,
+        };
+        updatedLayout.push({
+          i: id,
+          minW: 4,
+          minH: 5,
+          w: 4,
+          h: 8,
+          x: getXVal(updatedLayout),
+          y: Infinity,
+        });
+      });
+      console.log('updated layout:', updatedLayout);
+      setItemMeta(defaultItemMeta);
+      setLayout(updatedLayout);
+    }
+  };
 
   useEffect(() => {
     window.electron.ipcRenderer.on(
       'openFiles',
       (files: { name: string; data: string }[]) => {
         if (files) {
-          const updatedLayout = layout;
-          const defaultItemMeta: { [id: string]: ItemMeta } = {};
+          console.log('files: ', files);
+          const updatedLayout = [...layout];
+          const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
           files.forEach((item) => {
             const id: string = uuidv4();
             const { data, name } = item;
@@ -110,11 +144,15 @@ const HomeSpace = () => {
               y: Infinity,
             });
           });
+          console.log('updated layout:', updatedLayout);
           setItemMeta(defaultItemMeta);
           setLayout(updatedLayout);
         }
       }
     );
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('openFiles');
+    };
   });
 
   const setItemName = (newName: string, id: string) => {

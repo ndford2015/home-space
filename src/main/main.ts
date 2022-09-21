@@ -72,7 +72,6 @@ ipcMain.on('rename', (_event, arg) => {
 });
 
 ipcMain.on('open', () => {
-  console.log('open called');
   db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
     if (err) {
       throw err;
@@ -94,7 +93,11 @@ ipcMain.on('open', () => {
       files.filePaths.forEach((filePath) => {
         const data = readFileSync(filePath);
         const filename: string = filePath.replace(/^.*[\\/]/, '');
-        link(filePath, `${todayDir}/${filename}`, () => {});
+        const dirPath: string = filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+        console.log('filepath:', dirPath, 'todayDir:', todayDir);
+        if (dirPath !== todayDir) {
+          link(filePath, `${todayDir}/${filename}`, () => {});
+        }
         fileMeta.push({
           name: filename,
           data: data.toString(),
