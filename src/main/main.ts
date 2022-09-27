@@ -23,6 +23,8 @@ import {
   readdirSync,
   readFileSync,
   link,
+  Stats,
+  stat,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -62,6 +64,10 @@ ipcMain.on('rename', (_event, arg) => {
     writeFile(newPath, '', (err) => {
       if (err) throw err;
       console.log('The file has been created!');
+      stat(newPath, (statErr, stats: Stats): void => {
+        const fileId = `${stats.dev}-${stats.ino}`;
+        console.log(fileId);
+      });
     });
   } else {
     rename(oldPath, newPath, (err) => {

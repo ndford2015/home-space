@@ -90,8 +90,8 @@ const HomeSpace = () => {
   const openFiles = (files: { name: string; data: string }[]) => {
     if (files) {
       console.log('files: ', files);
-      const updatedLayout = layout;
-      const defaultItemMeta: { [id: string]: ItemMeta } = itemMeta;
+      const updatedLayout = [...layout];
+      const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
       files.forEach((item) => {
         const id: string = uuidv4();
         const { data, name } = item;
@@ -118,44 +118,17 @@ const HomeSpace = () => {
   };
 
   useEffect(() => {
-    window.electron.ipcRenderer.on(
-      'openFiles',
-      (files: { name: string; data: string }[]) => {
-        if (files) {
-          console.log('files: ', files);
-          const updatedLayout = [...layout];
-          const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
-          files.forEach((item) => {
-            const id: string = uuidv4();
-            const { data, name } = item;
-            const nameNoExt = name.replace(/(\..*)$/i, '');
-            defaultItemMeta[id] = {
-              type: ItemType.NOTE,
-              name: nameNoExt,
-              data,
-            };
-            updatedLayout.push({
-              i: id,
-              minW: 4,
-              minH: 5,
-              w: 4,
-              h: 8,
-              x: getXVal(updatedLayout),
-              y: Infinity,
-            });
-          });
-          console.log('updated layout:', updatedLayout);
-          setItemMeta(defaultItemMeta);
-          setLayout(updatedLayout);
-        }
-      }
-    );
+    window.electron.ipcRenderer.on('openFiles', openFiles);
     return () => {
       window.electron.ipcRenderer.removeAllListeners('openFiles');
     };
   });
 
   const setItemName = (newName: string, id: string) => {
+    console.log('new name: ', newName);
+    if (!newName) {
+      return;
+    }
     const prevName = itemMeta[id].name;
     window.electron.ipcRenderer.send('rename', { prevName, newName });
     setItemMeta({
@@ -165,7 +138,6 @@ const HomeSpace = () => {
   };
 
   const openFile = () => {
-    console.log('open file called');
     window.electron.ipcRenderer.send('open');
   };
 

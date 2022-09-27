@@ -20,6 +20,11 @@ const Menu = (props: MenuProps) => {
     setAddMenuOpen(false);
   };
 
+  const openFileSelector = (): void => {
+    props.openFile();
+    setOpen(false);
+  };
+
   const getAddMenu = () => {
     if (!addMenuOpen) {
       return null;
@@ -36,7 +41,7 @@ const Menu = (props: MenuProps) => {
       <div className="menu-container">
         <span onClick={() => setAddMenuOpen(!addMenuOpen)}>Add ...</span>
         {getAddMenu()}
-        <span onClick={props.openFile}>Open</span>
+        <span onClick={openFileSelector}>Open</span>
       </div>
     );
   };

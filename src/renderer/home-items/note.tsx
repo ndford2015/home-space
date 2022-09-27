@@ -30,6 +30,7 @@ const Note = (props: NoteItemProps) => {
 
   return (
     <RichTextEditor
+      autoFocus
       className="notepad-container"
       value={value}
       onChange={onChange}
