@@ -26,7 +26,8 @@ const Note = (props: NoteItemProps) => {
         RichTextEditor.createValueFromString(props.defaultVal, 'markdown')
       );
     }
-  }, [props]);
+    // eslint-disable-next-line react/destructuring-assignment
+  }, [props.defaultVal]);
 
   return (
     <RichTextEditor

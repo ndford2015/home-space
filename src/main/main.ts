@@ -24,7 +24,7 @@ import {
   readFileSync,
   link,
   Stats,
-  stat,
+  statSync,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -37,6 +37,7 @@ export default class AppUpdater {
   }
 }
 let todayDir = '';
+let mainWindow: BrowserWindow | null;
 const sqlite3 = sqlite.verbose();
 const db = new sqlite3.Database(
   path.resolve(app.getPath('userData'), 'homespace.db')
@@ -45,8 +46,6 @@ const DEFAULT_DIR_SQL = 'select value from settings where id = ?';
 const DEFAULT_DIR_ID = 'defaultDir';
 const CREATE_SETTINGS_SQL =
   'CREATE TABLE if not exists settings (id TEXT, value TEXT)';
-
-let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('noteUpdate', (_event, arg) => {
   console.log('note name: ', arg.name);
@@ -63,11 +62,14 @@ ipcMain.on('rename', (_event, arg) => {
   if (!existsSync(oldPath)) {
     writeFile(newPath, '', (err) => {
       if (err) throw err;
-      console.log('The file has been created!');
-      stat(newPath, (statErr, stats: Stats): void => {
-        const fileId = `${stats.dev}-${stats.ino}`;
-        console.log(fileId);
-      });
+      const stats: Stats = statSync(newPath);
+      const fileMeta: { layoutId: string; id: string } = {
+        id: `${stats.dev}-${stats.ino}`,
+        layoutId: arg.layoutId,
+      };
+      if (mainWindow) {
+        mainWindow.webContents.send('fileSaved', fileMeta);
+      }
     });
   } else {
     rename(oldPath, newPath, (err) => {
@@ -95,7 +97,7 @@ ipcMain.on('open', () => {
     );
     if (files.filePaths.length) {
       // TODO: deduplicate
-      const fileMeta: { name: string; data: string }[] = [];
+      const fileMeta: { name: string; data: string; id: string }[] = [];
       files.filePaths.forEach((filePath) => {
         const data = readFileSync(filePath);
         const filename: string = filePath.replace(/^.*[\\/]/, '');
@@ -104,11 +106,14 @@ ipcMain.on('open', () => {
         if (dirPath !== todayDir) {
           link(filePath, `${todayDir}/${filename}`, () => {});
         }
+        const stats: Stats = statSync(filePath);
         fileMeta.push({
           name: filename,
           data: data.toString(),
+          id: `${stats.dev}-${stats.ino}`,
         });
       });
+      console.log('filemeta:', fileMeta);
       mainWindow.webContents.send('openFiles', fileMeta);
     }
   });
@@ -127,12 +132,17 @@ if (isDevelopment) {
 }
 
 const loadHome = async () => {
-  const fileMeta: { name: string; data: string }[] = [];
+  const fileMeta: { name: string; data: string; id: string }[] = [];
   const files: string[] = readdirSync(todayDir);
   files.forEach((file) => {
     const filePath = `${todayDir}/${file}`;
     const data = readFileSync(filePath);
-    fileMeta.push({ name: file, data: data.toString() });
+    const stats: Stats = statSync(filePath);
+    fileMeta.push({
+      name: file,
+      data: data.toString(),
+      id: `${stats.dev}-${stats.ino}`,
+    });
   });
   if (mainWindow) {
     console.log('fileMeta: ', fileMeta);

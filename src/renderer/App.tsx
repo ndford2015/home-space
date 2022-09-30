@@ -12,6 +12,7 @@ interface ItemMeta {
   readonly type: ItemType;
   readonly name: string;
   readonly data: string;
+  readonly id?: string;
 }
 
 const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
@@ -51,7 +52,9 @@ const HomeSpace = () => {
     ]);
   };
 
-  const loadHome = (defaultItems: { name: string; data: string }[]) => {
+  const loadHome = (
+    defaultItems: { name: string; data: string; id: string }[]
+  ) => {
     if (defaultItems) {
       console.log('default items:', defaultItems);
       const defaultLayout: Layout[] = [];
@@ -64,6 +67,7 @@ const HomeSpace = () => {
           type: ItemType.NOTE,
           name: nameNoExt,
           data,
+          id: item.id,
         };
         defaultLayout.push({
           i: id,
@@ -87,19 +91,28 @@ const HomeSpace = () => {
     };
   });
 
-  const openFiles = (files: { name: string; data: string }[]) => {
+  const openFiles = (files: { name: string; data: string; id: string }[]) => {
     if (files) {
       console.log('files: ', files);
       const updatedLayout = [...layout];
       const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
+      console.log('item meta before: ', defaultItemMeta);
+      const metaIds: Set<string> = new Set(
+        Object.values(defaultItemMeta).map((val) => val.id || '')
+      );
       files.forEach((item) => {
+        console.log('metaIds: ', metaIds, ' id: ', item.id);
+        if (metaIds.has(item.id)) {
+          return;
+        }
         const id: string = uuidv4();
         const { data, name } = item;
         const nameNoExt = name.replace(/(\..*)$/i, '');
         defaultItemMeta[id] = {
           type: ItemType.NOTE,
           name: nameNoExt,
-          data,
+          data: data.replace(/(\s|\n)+$/, ''),
+          id: item.id,
         };
         updatedLayout.push({
           i: id,
@@ -111,7 +124,12 @@ const HomeSpace = () => {
           y: Infinity,
         });
       });
-      console.log('updated layout:', updatedLayout);
+      console.log(
+        'updated layout:',
+        updatedLayout,
+        ' updatedMeta: ',
+        defaultItemMeta
+      );
       setItemMeta(defaultItemMeta);
       setLayout(updatedLayout);
     }
@@ -124,13 +142,34 @@ const HomeSpace = () => {
     };
   });
 
+  const fileSaved = (fileMeta: { id: string; layoutId: string }) => {
+    setItemMeta({
+      ...itemMeta,
+      [fileMeta.layoutId]: {
+        ...itemMeta[fileMeta.layoutId],
+        id: fileMeta.id,
+      },
+    });
+  };
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on('fileSaved', fileSaved);
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('fileSaved');
+    };
+  });
+
   const setItemName = (newName: string, id: string) => {
     console.log('new name: ', newName);
     if (!newName) {
       return;
     }
     const prevName = itemMeta[id].name;
-    window.electron.ipcRenderer.send('rename', { prevName, newName });
+    window.electron.ipcRenderer.send('rename', {
+      prevName,
+      newName,
+      layoutId: id,
+    });
     setItemMeta({
       ...itemMeta,
       [id]: { ...itemMeta[id], name: newName },
