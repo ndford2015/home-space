@@ -10,7 +10,12 @@ interface NoteItemProps {
   defaultVal: string;
 }
 const Note = (props: NoteItemProps) => {
-  const [value, setValue] = useState(RichTextEditor.createEmptyValue());
+  const { defaultVal } = props;
+  const [value, setValue] = useState(
+    defaultVal
+      ? RichTextEditor.createValueFromString(defaultVal, 'markdown')
+      : RichTextEditor.createEmptyValue()
+  );
   const debouncedOnChange: any = useCallback(
     debounce((val: any) => props.onChange(val.toString('markdown')), 3000),
     [props]
@@ -19,15 +24,6 @@ const Note = (props: NoteItemProps) => {
     setValue(val);
     debouncedOnChange(val);
   };
-
-  useEffect(() => {
-    if (props.defaultVal) {
-      setValue(
-        RichTextEditor.createValueFromString(props.defaultVal, 'markdown')
-      );
-    }
-    // eslint-disable-next-line react/destructuring-assignment
-  }, [props.defaultVal]);
 
   return (
     <RichTextEditor

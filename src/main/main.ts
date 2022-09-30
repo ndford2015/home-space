@@ -133,7 +133,9 @@ if (isDevelopment) {
 
 const loadHome = async () => {
   const fileMeta: { name: string; data: string; id: string }[] = [];
-  const files: string[] = readdirSync(todayDir);
+  const files: string[] = readdirSync(todayDir).filter(
+    (item) => !/(^|\/)\.[^/.]/g.test(item)
+  );
   files.forEach((file) => {
     const filePath = `${todayDir}/${file}`;
     const data = readFileSync(filePath);

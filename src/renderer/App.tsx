@@ -15,6 +15,19 @@ interface ItemMeta {
   readonly id?: string;
 }
 
+declare global {
+  interface Window {
+    electron: {
+      ipcRenderer: {
+        send: (channel: string, data?: any) => void;
+        on: (channel: string, func: any) => void;
+        once: (channel: string, func: any) => void;
+        removeAllListeners: (channel: string) => void;
+      };
+    };
+  }
+}
+
 const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
   WidthProvider(GridLayout);
 
@@ -56,7 +69,7 @@ const HomeSpace = () => {
     defaultItems: { name: string; data: string; id: string }[]
   ) => {
     if (defaultItems) {
-      console.log('default items:', defaultItems);
+      console.log('default Items: ', defaultItems);
       const defaultLayout: Layout[] = [];
       const defaultItemMeta: { [id: string]: ItemMeta } = {};
       defaultItems.forEach((item) => {
@@ -93,15 +106,12 @@ const HomeSpace = () => {
 
   const openFiles = (files: { name: string; data: string; id: string }[]) => {
     if (files) {
-      console.log('files: ', files);
       const updatedLayout = [...layout];
       const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
-      console.log('item meta before: ', defaultItemMeta);
       const metaIds: Set<string> = new Set(
         Object.values(defaultItemMeta).map((val) => val.id || '')
       );
       files.forEach((item) => {
-        console.log('metaIds: ', metaIds, ' id: ', item.id);
         if (metaIds.has(item.id)) {
           return;
         }
@@ -111,7 +121,7 @@ const HomeSpace = () => {
         defaultItemMeta[id] = {
           type: ItemType.NOTE,
           name: nameNoExt,
-          data: data.replace(/(\s|\n)+$/, ''),
+          data: data.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''),
           id: item.id,
         };
         updatedLayout.push({
@@ -124,12 +134,6 @@ const HomeSpace = () => {
           y: Infinity,
         });
       });
-      console.log(
-        'updated layout:',
-        updatedLayout,
-        ' updatedMeta: ',
-        defaultItemMeta
-      );
       setItemMeta(defaultItemMeta);
       setLayout(updatedLayout);
     }
