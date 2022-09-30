@@ -1,23 +1,21 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+  // todo: add channel whitelists
   ipcRenderer: {
-    myPing() {
-      ipcRenderer.send('ipc-example', 'ping');
+    send(channel, data) {
+      ipcRenderer.send(channel, data);
     },
     on(channel, func) {
-      const validChannels = ['defaultDir'];
-      if (validChannels.includes(channel)) {
-        // Deliberately strip event as it includes `sender`
-        ipcRenderer.on(channel, (event, ...args) => func(...args));
-      }
+      // Deliberately strip event as it includes `sender`
+      ipcRenderer.on(channel, (event, ...args) => func(...args));
     },
     once(channel, func) {
-      const validChannels = ['ipc-example'];
-      if (validChannels.includes(channel)) {
-        // Deliberately strip event as it includes `sender`
-        ipcRenderer.once(channel, (event, ...args) => func(...args));
-      }
+      // Deliberately strip event as it includes `sender`
+      ipcRenderer.once(channel, (event, ...args) => func(...args));
+    },
+    removeAllListeners(channel) {
+      ipcRenderer.removeAllListeners(channel);
     },
   },
 });

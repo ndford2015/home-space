@@ -15,7 +15,17 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import sqlite from 'sqlite3';
-import { existsSync, mkdirSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  writeFile,
+  rename,
+  readdirSync,
+  readFileSync,
+  link,
+  Stats,
+  statSync,
+} from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
@@ -26,18 +36,87 @@ export default class AppUpdater {
     autoUpdater.checkForUpdatesAndNotify();
   }
 }
-
+let todayDir = '';
+let mainWindow: BrowserWindow | null;
 const sqlite3 = sqlite.verbose();
 const db = new sqlite3.Database(
   path.resolve(app.getPath('userData'), 'homespace.db')
 );
+const DEFAULT_DIR_SQL = 'select value from settings where id = ?';
+const DEFAULT_DIR_ID = 'defaultDir';
+const CREATE_SETTINGS_SQL =
+  'CREATE TABLE if not exists settings (id TEXT, value TEXT)';
 
-let mainWindow: BrowserWindow | null = null;
+ipcMain.on('noteUpdate', (_event, arg) => {
+  console.log('note name: ', arg.name);
+  const filepath = `${todayDir}/${arg.name}.md`;
+  writeFile(filepath, arg.val, (err) => {
+    if (err) throw err;
+    console.log('The file has been saved!');
+  });
+});
 
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
+ipcMain.on('rename', (_event, arg) => {
+  const oldPath = `${todayDir}/${arg.prevName}.md`;
+  const newPath = `${todayDir}/${arg.newName}.md`;
+  if (!existsSync(oldPath)) {
+    writeFile(newPath, '', (err) => {
+      if (err) throw err;
+      const stats: Stats = statSync(newPath);
+      const fileMeta: { layoutId: string; id: string } = {
+        id: `${stats.dev}-${stats.ino}`,
+        layoutId: arg.layoutId,
+      };
+      if (mainWindow) {
+        mainWindow.webContents.send('fileSaved', fileMeta);
+      }
+    });
+  } else {
+    rename(oldPath, newPath, (err) => {
+      if (err) throw err;
+      console.log('The file has been renamed to ', newPath);
+    });
+  }
+});
+
+ipcMain.on('open', () => {
+  db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
+    if (err) {
+      throw err;
+    }
+    if (!mainWindow) {
+      throw new Error('"mainWindow" is not defined');
+    }
+    const files: Electron.OpenDialogReturnValue = await dialog.showOpenDialog(
+      mainWindow,
+      {
+        defaultPath: defaultDir.value,
+        filters: [{ name: 'Notes', extensions: ['md'] }],
+        properties: ['openFile'],
+      }
+    );
+    if (files.filePaths.length) {
+      // TODO: deduplicate
+      const fileMeta: { name: string; data: string; id: string }[] = [];
+      files.filePaths.forEach((filePath) => {
+        const data = readFileSync(filePath);
+        const filename: string = filePath.replace(/^.*[\\/]/, '');
+        const dirPath: string = filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+        console.log('filepath:', dirPath, 'todayDir:', todayDir);
+        if (dirPath !== todayDir) {
+          link(filePath, `${todayDir}/${filename}`, () => {});
+        }
+        const stats: Stats = statSync(filePath);
+        fileMeta.push({
+          name: filename,
+          data: data.toString(),
+          id: `${stats.dev}-${stats.ino}`,
+        });
+      });
+      console.log('filemeta:', fileMeta);
+      mainWindow.webContents.send('openFiles', fileMeta);
+    }
+  });
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -51,6 +130,27 @@ const isDevelopment =
 if (isDevelopment) {
   require('electron-debug')();
 }
+
+const loadHome = async () => {
+  const fileMeta: { name: string; data: string; id: string }[] = [];
+  const files: string[] = readdirSync(todayDir).filter(
+    (item) => !/(^|\/)\.[^/.]/g.test(item)
+  );
+  files.forEach((file) => {
+    const filePath = `${todayDir}/${file}`;
+    const data = readFileSync(filePath);
+    const stats: Stats = statSync(filePath);
+    fileMeta.push({
+      name: file,
+      data: data.toString(),
+      id: `${stats.dev}-${stats.ino}`,
+    });
+  });
+  if (mainWindow) {
+    console.log('fileMeta: ', fileMeta);
+    mainWindow.webContents.send('loadHome', fileMeta);
+  }
+};
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -81,9 +181,64 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  const sqlCb = (err: Error) => {
+    if (err) {
+      throw err;
+    }
+  };
+
+  const getPathString = (
+    selectedPath: Electron.OpenDialogReturnValue
+  ): string =>
+    selectedPath.filePaths.length
+      ? `${selectedPath.filePaths[0]}/homespace`
+      : `${app.getPath('home')}/homespace`;
+
+  const setHomeDir = async (
+    resolve: (value: string | PromiseLike<string>) => void
+  ) => {
+    if (!mainWindow) {
+      throw new Error('"mainWindow" is not defined');
+    }
+    // Allow user to select directory for HomeSpace files
+    const selectedDir = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+    });
+    const homeSpaceDir: string = getPathString(selectedDir);
+    // Create setting for user selected home path
+    db.run(`INSERT INTO settings(id, value) VALUES(?, ?)`, [
+      DEFAULT_DIR_ID,
+      homeSpaceDir,
+      sqlCb,
+    ]);
+    if (!existsSync(homeSpaceDir)) {
+      mkdirSync(homeSpaceDir);
+    }
+    resolve(homeSpaceDir);
+  };
+
+  const initializeDefaultDir = () =>
+    new Promise<string>((resolve) => {
+      db.serialize(async () => {
+        // Create the table to insert user settings if it doesn't exist
+        db.run(CREATE_SETTINGS_SQL, sqlCb);
+        // Get the default directory to store user files if it has been set
+        db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
+          if (err) {
+            throw err;
+          }
+          if (defaultDir) {
+            resolve(defaultDir.value);
+            return;
+          }
+          setHomeDir(resolve);
+        });
+      });
+    });
+
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1024,
+    width: 1200,
     height: 728,
     icon: getAssetPath('icon.png'),
     webPreferences: {
@@ -93,8 +248,6 @@ const createWindow = async () => {
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
 
-  // @TODO: Use 'ready-to-show' event
-  //        https://github.com/electron/electron/blob/main/docs/api/browser-window.md#using-ready-to-show-event
   mainWindow.webContents.on('did-finish-load', async () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
@@ -104,64 +257,20 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
-      let defaultDir = '';
-      const dbPromise = new Promise((resolve, reject) => {
-        db.serialize(async () => {
-          console.log('running db scripts');
-          db.run('CREATE TABLE if not exists settings (id TEXT, value TEXT)');
-          const defaultDirSql = 'select value from settings where id = ?';
-          const defaultDirId = 'defaultDir';
-          // eslint-disable-next-line promise/param-names
-          const getDefaultDir = new Promise((res, rej) => {
-            db.get(defaultDirSql, [defaultDirId], (err, row) => {
-              if (err) {
-                rej(err.message);
-              }
-              if (row) {
-                defaultDir = row.value;
-                console.log('default dir: ', defaultDir);
-                res(true);
-              }
-              res(true);
-            });
-          });
-          await getDefaultDir;
-
-          if (!defaultDir && mainWindow) {
-            console.log('sending main window');
-            // return mainWindow.webContents.send('defaultDir', '');
-            const selectedDir = await dialog.showOpenDialog(mainWindow, {
-              properties: ['openDirectory'],
-            });
-            const homeSpaceDir = selectedDir.filePaths.length
-              ? `${selectedDir.filePaths[0]}/homespace`
-              : `${app.getPath('home')}/homespace`;
-            console.log('selected dir: ', homeSpaceDir);
-            db.run(
-              `INSERT INTO settings(id, value) VALUES(?, ?)`,
-              ['defaultDir', homeSpaceDir],
-              (insErr) => {
-                if (insErr) {
-                  reject(insErr.message);
-                }
-                if (!existsSync(homeSpaceDir)) {
-                  mkdirSync(homeSpaceDir);
-                }
-                defaultDir = homeSpaceDir;
-                resolve(homeSpaceDir);
-              }
-            );
-          } else {
-            resolve(true);
-          }
-        });
-      });
-      await dbPromise;
-      db.close();
-      const date: string = new Date().toISOString().split('T')[0];
-      const todayDir = `${defaultDir}/${date}`;
-      if (!existsSync(todayDir)) {
-        mkdirSync(todayDir);
+      try {
+        const defaultDir = await initializeDefaultDir();
+        const date: string = new Date().toISOString().split('T')[0];
+        todayDir = `${defaultDir}/${date}`;
+        if (!existsSync(todayDir)) {
+          mkdirSync(todayDir);
+        } else {
+          loadHome();
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (e: any) {
+        if (e.message) {
+          console.error(e.message);
+        }
       }
     }
   });

@@ -2,11 +2,12 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 import React, { useState } from 'react';
 import { FaBars, FaTimes } from 'react-icons/fa';
-import { ItemType } from 'renderer/constants';
+import { ItemType } from '../constants';
 import './menu.global.scss';
 
 interface MenuProps {
   addItem(type: ItemType): void;
+  openFile(): void;
 }
 
 const Menu = (props: MenuProps) => {
@@ -17,6 +18,11 @@ const Menu = (props: MenuProps) => {
     props.addItem(type);
     setOpen(false);
     setAddMenuOpen(false);
+  };
+
+  const openFileSelector = (): void => {
+    props.openFile();
+    setOpen(false);
   };
 
   const getAddMenu = () => {
@@ -35,25 +41,32 @@ const Menu = (props: MenuProps) => {
       <div className="menu-container">
         <span onClick={() => setAddMenuOpen(!addMenuOpen)}>Add ...</span>
         {getAddMenu()}
+        <span onClick={openFileSelector}>Open</span>
       </div>
     );
   };
-
+  // TODO: clean up duplication
   return !open ? (
     <div className="home-menu">
-      <FaBars
-        onClick={() => setOpen(true)}
-        className="home-menu-icon"
-        size={40}
-      />
+      <div className="menu-icon-container">
+        <FaBars
+          onClick={() => setOpen(true)}
+          className="home-menu-icon"
+          size={30}
+        />
+        <h1>HomeSpace</h1>
+      </div>
     </div>
   ) : (
     <div className="home-menu">
-      <FaTimes
-        onClick={() => setOpen(false)}
-        className="home-menu-icon"
-        size={40}
-      />
+      <div className="menu-icon-container">
+        <FaTimes
+          onClick={() => setOpen(false)}
+          className="home-menu-icon"
+          size={30}
+        />
+        <h1>HomeSpace</h1>
+      </div>
       {getMenuItems()}
     </div>
   );

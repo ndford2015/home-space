@@ -11,6 +11,21 @@ import Note from './home-items/note';
 interface ItemMeta {
   readonly type: ItemType;
   readonly name: string;
+  readonly data: string;
+  readonly id?: string;
+}
+
+declare global {
+  interface Window {
+    electron: {
+      ipcRenderer: {
+        send: (channel: string, data?: any) => void;
+        on: (channel: string, func: any) => void;
+        once: (channel: string, func: any) => void;
+        removeAllListeners: (channel: string) => void;
+      };
+    };
+  }
 }
 
 const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
@@ -20,45 +35,171 @@ const HomeSpace = () => {
   const [layout, setLayout] = useState<Layout[]>([]);
   const [itemMeta, setItemMeta] = useState<{ [id: string]: ItemMeta }>({});
 
-  const getNameByType = (type: ItemType): string => {
-    switch (type) {
-      case ItemType.NOTE:
-        return 'Note';
-      default:
-        return '';
+  const getXVal = (updatedLayout: Layout[]) => {
+    if (!updatedLayout.length) {
+      return 0;
     }
+    const prev = updatedLayout[updatedLayout.length - 1];
+    const prevRight = prev.x + prev.w;
+
+    return prevRight > 8 ? 0 : prevRight;
   };
 
-  useEffect(() => {
-    window.electron.ipcRenderer.on('defaultDir', (val) => {
-      console.log('val', val);
-    });
-  }, []);
-
-  const addItem = (type: ItemType) => {
+  const addItem = (type: ItemType, name?: string, data?: string) => {
     const id: string = uuidv4();
+    setItemMeta({
+      ...itemMeta,
+      [id]: { type, name: name || '', data: data || '' },
+    });
     setLayout([
       ...layout,
       {
         i: id,
-        minW: 5,
+        minW: 4,
         minH: 5,
-        w: 5,
+        w: 4,
         h: 8,
-        x: (layout.length % 2) * 5,
+        x: getXVal(layout),
         y: Infinity,
       },
     ]);
+  };
+
+  const loadHome = (
+    defaultItems: { name: string; data: string; id: string }[]
+  ) => {
+    if (defaultItems) {
+      const defaultLayout: Layout[] = [];
+      const defaultItemMeta: { [id: string]: ItemMeta } = {};
+      defaultItems.forEach((item) => {
+        const id: string = uuidv4();
+        const { data, name } = item;
+        const nameNoExt = name.replace(/(\..*)$/i, '');
+        defaultItemMeta[id] = {
+          type: ItemType.NOTE,
+          name: nameNoExt,
+          data,
+          id: item.id,
+        };
+        defaultLayout.push({
+          i: id,
+          minW: 4,
+          minH: 5,
+          w: 4,
+          h: 8,
+          x: getXVal(defaultLayout),
+          y: Infinity,
+        });
+      });
+      setItemMeta(defaultItemMeta);
+      setLayout(defaultLayout);
+    }
+  };
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on('loadHome', loadHome);
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('loadHome');
+    };
+  });
+
+  const openFiles = (files: { name: string; data: string; id: string }[]) => {
+    if (files) {
+      const updatedLayout = [...layout];
+      const defaultItemMeta: { [id: string]: ItemMeta } = { ...itemMeta };
+      const metaIds: Set<string> = new Set(
+        Object.values(defaultItemMeta).map((val) => val.id || '')
+      );
+      files.forEach((item) => {
+        if (metaIds.has(item.id)) {
+          return;
+        }
+        const id: string = uuidv4();
+        const { data, name } = item;
+        const nameNoExt = name.replace(/(\..*)$/i, '');
+        defaultItemMeta[id] = {
+          type: ItemType.NOTE,
+          name: nameNoExt,
+          data: data.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''),
+          id: item.id,
+        };
+        updatedLayout.push({
+          i: id,
+          minW: 4,
+          minH: 5,
+          w: 4,
+          h: 8,
+          x: getXVal(updatedLayout),
+          y: Infinity,
+        });
+      });
+      setItemMeta(defaultItemMeta);
+      setLayout(updatedLayout);
+    }
+  };
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on('openFiles', openFiles);
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('openFiles');
+    };
+  });
+
+  const fileSaved = (fileMeta: { id: string; layoutId: string }) => {
     setItemMeta({
       ...itemMeta,
-      [id]: { type, name: getNameByType(type) },
+      [fileMeta.layoutId]: {
+        ...itemMeta[fileMeta.layoutId],
+        id: fileMeta.id,
+      },
     });
   };
 
-  const getItemByType = (type: ItemType): JSX.Element | null => {
+  useEffect(() => {
+    window.electron.ipcRenderer.on('fileSaved', fileSaved);
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('fileSaved');
+    };
+  });
+
+  const setItemName = (newName: string, id: string) => {
+    console.log('new name: ', newName);
+    if (!newName) {
+      return;
+    }
+    const prevName = itemMeta[id].name;
+    window.electron.ipcRenderer.send('rename', {
+      prevName,
+      newName,
+      layoutId: id,
+    });
+    setItemMeta({
+      ...itemMeta,
+      [id]: { ...itemMeta[id], name: newName },
+    });
+  };
+
+  const openFile = () => {
+    window.electron.ipcRenderer.send('open');
+  };
+
+  const saveNote = (id: string, val: string) => {
+    const { name } = itemMeta[id];
+    if (!name) {
+      return;
+    }
+    window.electron.ipcRenderer.send('noteUpdate', { name, val });
+  };
+
+  const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
-        return <Note />;
+        return (
+          <Note
+            defaultVal={itemMeta[id].data}
+            onChange={(val: string) => saveNote(id, val)}
+          />
+        );
       default:
         return null;
     }
@@ -71,7 +212,7 @@ const HomeSpace = () => {
     setItemMeta(updatedTypes);
   };
 
-  const getItemHeader = (meta: ItemMeta, id: string): JSX.Element => {
+  const getItemHeader = (id: string): JSX.Element => {
     return (
       <div className="item-header">
         <div className="drag-handle">
@@ -80,14 +221,10 @@ const HomeSpace = () => {
         <span
           contentEditable
           data-placeholder="Enter name here"
-          onChange={(evt) =>
-            setItemMeta({
-              ...itemMeta,
-              [id]: { ...itemMeta[id], name: evt.currentTarget.innerHTML },
-            })
-          }
+          onBlur={(evt) => setItemName(evt.currentTarget.innerText, id)}
+          suppressContentEditableWarning
         >
-          {meta.name}
+          {itemMeta[id].name}
         </span>
         <FaTimes
           onClick={() => removeItem(id)}
@@ -99,14 +236,17 @@ const HomeSpace = () => {
 
   const getItems = (): JSX.Element[] => {
     return layout.map((item) => {
+      if (!itemMeta[item.i]) {
+        return <div />;
+      }
       const { type } = itemMeta[item.i];
-      const itemUi: JSX.Element | null = getItemByType(type);
+      const itemUi: JSX.Element | null = getItemByType(type, item.i);
       if (!itemUi) {
         return <></>;
       }
       return (
         <div key={item.i} className="draggable-container">
-          {getItemHeader(itemMeta[item.i], item.i)}
+          {getItemHeader(item.i)}
           {itemUi}
         </div>
       );
@@ -115,7 +255,7 @@ const HomeSpace = () => {
 
   return (
     <>
-      <Menu addItem={addItem} />
+      <Menu addItem={addItem} openFile={openFile} />
       <ReactGridLayout
         className="layout"
         onLayoutChange={setLayout}

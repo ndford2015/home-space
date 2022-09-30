@@ -16,6 +16,9 @@
       height: 100%;
     }
   }
+  button {
+    background: white;
+  }
 }
 
 .draggable-container {
@@ -23,6 +26,10 @@
   .react-resizable-handle {
     z-index: 10;
   }
+}
+
+.react-grid-layout {
+  top: 60px;
 }
 
 .drag-handle {
