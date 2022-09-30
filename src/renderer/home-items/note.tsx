@@ -16,11 +16,11 @@ const Note = (props: NoteItemProps) => {
       ? RichTextEditor.createValueFromString(defaultVal, 'markdown')
       : RichTextEditor.createEmptyValue()
   );
-  const debouncedOnChange: any = useCallback(
-    debounce((val: any) => props.onChange(val.toString('markdown')), 3000),
+  const debouncedOnChange = useCallback(
+    debounce((val) => props.onChange(val.toString('markdown')), 3000),
     [props]
   );
-  const onChange = (val: any) => {
+  const onChange = (val) => {
     setValue(val);
     debouncedOnChange(val);
   };

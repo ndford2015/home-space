@@ -5,6 +5,7 @@
     "lib": ["dom", "esnext"],
     "declaration": true,
     "declarationMap": true,
+    "noImplicitAny": false,
     "noEmit": true,
     "jsx": "react",
     "strict": true,
