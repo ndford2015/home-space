@@ -257,7 +257,7 @@
     "react-grid-layout": "^1.2.5",
     "react-icons": "^4.2.0",
     "react-router-dom": "^5.2.0",
-    "react-rte": "^0.17.1",
+    "react-rte": "^0.16.5",
     "regenerator-runtime": "^0.13.5",
     "uuid": "^8.3.2"
   },
