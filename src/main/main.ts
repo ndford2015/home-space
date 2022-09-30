@@ -79,6 +79,10 @@ ipcMain.on('rename', (_event, arg) => {
   }
 });
 
+const getParentDirPath = (filePath: string) => {
+  return filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+};
+
 ipcMain.on('open', () => {
   db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
     if (err) {
@@ -101,7 +105,7 @@ ipcMain.on('open', () => {
       files.filePaths.forEach((filePath) => {
         const data = readFileSync(filePath);
         const filename: string = filePath.replace(/^.*[\\/]/, '');
-        const dirPath: string = filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+        const dirPath: string = getParentDirPath(filePath);
         console.log('filepath:', dirPath, 'todayDir:', todayDir);
         if (dirPath !== todayDir) {
           link(filePath, `${todayDir}/${filename}`, () => {});
@@ -131,11 +135,26 @@ if (isDevelopment) {
   require('electron-debug')();
 }
 
+const getTags = () => {
+  const tagDir = `${getParentDirPath(todayDir)}/tags`;
+  return readdirSync(tagDir, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => {
+      const stats: Stats = statSync(tagDir);
+      return {
+        name: dirent.name,
+        id: `${stats.dev}-${stats.ino}`,
+      };
+    });
+};
+
 const loadHome = async () => {
   const fileMeta: { name: string; data: string; id: string }[] = [];
   const files: string[] = readdirSync(todayDir).filter(
     (item) => !/(^|\/)\.[^/.]/g.test(item)
   );
+  const tags = getTags();
+  console.log('tags: ', tags);
   files.forEach((file) => {
     const filePath = `${todayDir}/${file}`;
     const data = readFileSync(filePath);
