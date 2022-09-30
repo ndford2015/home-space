@@ -5,6 +5,13 @@ import App from '../renderer/App';
 
 describe('App', () => {
   it('should render', () => {
+    const ipcRenderer: any = {
+      on: jest.fn(),
+      once: jest.fn(),
+      send: jest.fn(),
+      removeAllListeners: jest.fn(),
+    };
+    window.electron = { ipcRenderer };
     expect(render(<App />)).toBeTruthy();
   });
 });

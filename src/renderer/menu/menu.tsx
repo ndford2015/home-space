@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 import React, { useState } from 'react';
 import { FaBars, FaTimes } from 'react-icons/fa';
-import { ItemType } from 'renderer/constants';
+import { ItemType } from '../constants';
 import './menu.global.scss';
 
 interface MenuProps {

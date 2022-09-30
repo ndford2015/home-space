@@ -69,7 +69,6 @@ const HomeSpace = () => {
     defaultItems: { name: string; data: string; id: string }[]
   ) => {
     if (defaultItems) {
-      console.log('default Items: ', defaultItems);
       const defaultLayout: Layout[] = [];
       const defaultItemMeta: { [id: string]: ItemMeta } = {};
       defaultItems.forEach((item) => {

@@ -1,8 +1,8 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import RichTextEditor from 'react-rte';
-import { debounce } from 'renderer/utils';
+import { debounce } from '../utils';
 import './item.global.scss';
 
 interface NoteItemProps {
