@@ -25,6 +25,9 @@ import {
   link,
   Stats,
   statSync,
+  readdir,
+  stat,
+  Dirent,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -78,6 +81,10 @@ ipcMain.on('rename', (_event, arg) => {
     });
   }
 });
+
+const getFileId = (stats: Stats) => {
+  return `${stats.dev}-${stats.ino}`;
+};
 
 const getParentDirPath = (filePath: string) => {
   return filePath.replace(/[^\\/]*$/, '').slice(0, -1);
@@ -135,34 +142,75 @@ if (isDevelopment) {
   require('electron-debug')();
 }
 
-const getTags = () => {
+const populateFilesTagMappings = (
+  fileTags: { [fileId: string]: string[] },
+  tagPath: string,
+  tagId: string,
+  promises: Promise<void>[]
+): void => {
+  const files: Dirent[] = readdirSync(tagPath, { withFileTypes: true });
+  // eslint-disable-next-line array-callback-return
+  files.forEach((file: Dirent) => {
+    console.log('file:', file.name, 'tag: ', tagPath);
+    const filePath = `${tagPath}/${file.name}`;
+    promises.push(
+      new Promise<void>((resolve, reject) => {
+        stat(filePath, (_statErr, stats: Stats) => {
+          const fileId = getFileId(stats);
+          if (!fileTags[fileId]) {
+            fileTags[fileId] = [tagId];
+            console.log('fileTags:', fileTags);
+            resolve();
+          } else {
+            fileTags[fileId].push(tagId);
+            console.log('fileTags:', fileTags);
+            resolve();
+          }
+        });
+      })
+    );
+  });
+};
+
+const getFileTags = async () => {
   const tagDir = `${getParentDirPath(todayDir)}/tags`;
-  return readdirSync(tagDir, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory())
-    .map((dirent) => {
-      const stats: Stats = statSync(tagDir);
-      return {
-        name: dirent.name,
-        id: `${stats.dev}-${stats.ino}`,
-      };
-    });
+  const fileTags = {};
+  const allTags: { id: string; name: string }[] = [];
+  // TODO: swap with async calls for performance improvement
+  const tags: Dirent[] = readdirSync(tagDir, { withFileTypes: true }).filter(
+    (dirent) => dirent.isDirectory()
+  );
+  const promises: Promise<void>[] = [];
+  // eslint-disable-next-line no-restricted-syntax
+  tags.forEach((tag) => {
+    const tagPath = `${tagDir}/${tag.name}`;
+    const tagStats: Stats = statSync(tagPath);
+    const tagId = getFileId(tagStats);
+    allTags.push({ name: tag.name, id: tagId });
+    populateFilesTagMappings(fileTags, tagPath, tagId, promises);
+  });
+  await Promise.all(promises);
+  return { fileTags, allTags };
 };
 
 const loadHome = async () => {
-  const fileMeta: { name: string; data: string; id: string }[] = [];
+  const fileMeta: { name: string; data: string; id: string; tags: string[] }[] =
+    [];
   const files: string[] = readdirSync(todayDir).filter(
     (item) => !/(^|\/)\.[^/.]/g.test(item)
   );
-  const tags = getTags();
-  console.log('tags: ', tags);
+  const tags = await getFileTags();
+  console.log('filetags: ', tags);
   files.forEach((file) => {
     const filePath = `${todayDir}/${file}`;
     const data = readFileSync(filePath);
     const stats: Stats = statSync(filePath);
+    const id = getFileId(stats);
     fileMeta.push({
+      tags: tags.fileTags[id] || [],
       name: file,
       data: data.toString(),
-      id: `${stats.dev}-${stats.ino}`,
+      id,
     });
   });
   if (mainWindow) {
