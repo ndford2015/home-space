@@ -79,6 +79,14 @@ ipcMain.on('rename', (_event, arg) => {
   }
 });
 
+const getParentDirPath = (filePath: string) => {
+  return filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+};
+
+const getFileName = (filePath: string) => {
+  return filePath.replace(/^.*[\\/]/, '');
+};
+
 ipcMain.on('open', () => {
   db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
     if (err) {
@@ -100,8 +108,8 @@ ipcMain.on('open', () => {
       const fileMeta: { name: string; data: string; id: string }[] = [];
       files.filePaths.forEach((filePath) => {
         const data = readFileSync(filePath);
-        const filename: string = filePath.replace(/^.*[\\/]/, '');
-        const dirPath: string = filePath.replace(/[^\\/]*$/, '').slice(0, -1);
+        const filename: string = getFileName(filePath);
+        const dirPath: string = getParentDirPath(filePath);
         console.log('filepath:', dirPath, 'todayDir:', todayDir);
         if (dirPath !== todayDir) {
           link(filePath, `${todayDir}/${filename}`, () => {});
@@ -131,7 +139,12 @@ if (isDevelopment) {
   require('electron-debug')();
 }
 
-const loadHome = async () => {
+const loadHome = async (homeDir: string) => {
+  const todayDate: string = new Date().toISOString().split('T')[0];
+  todayDir = `${homeDir}/${todayDate}`;
+  if (!existsSync(todayDir)) {
+    mkdirSync(todayDir);
+  }
   const fileMeta: { name: string; data: string; id: string }[] = [];
   const files: string[] = readdirSync(todayDir).filter(
     (item) => !/(^|\/)\.[^/.]/g.test(item)
@@ -257,20 +270,39 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
-      try {
-        const defaultDir = await initializeDefaultDir();
-        const date: string = new Date().toISOString().split('T')[0];
-        todayDir = `${defaultDir}/${date}`;
-        if (!existsSync(todayDir)) {
-          mkdirSync(todayDir);
-        } else {
-          loadHome();
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
-        if (e.message) {
-          console.error(e.message);
-        }
+    }
+  });
+
+  // cases:
+  // 1. opening for first time today
+  //   a. no today dir, need to create it
+  // 2. Opening after first time today
+  //   a. check if dir exists, create if not. otherwise load home
+  // 3. Has been left open, date changed
+  //   a. create new date folder
+  // 4. Has been left open, date hasn't changed
+  mainWindow.on('focus', async () => {
+    try {
+      const todayDate: string = new Date().toISOString().split('T')[0];
+      console.log(
+        'main window focused. todayDir: ',
+        getFileName(todayDir),
+        'todayDate: ',
+        todayDate
+      );
+      // App already open
+      if (todayDir && getFileName(todayDir) === todayDate) {
+        return;
+      }
+      // Opening for the first time
+      const homeDir = todayDir
+        ? getParentDirPath(todayDir)
+        : await initializeDefaultDir();
+      loadHome(homeDir);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      if (e.message) {
+        console.error(e.message);
       }
     }
   });
@@ -309,7 +341,12 @@ app.on('window-all-closed', () => {
 
 app.whenReady().then(createWindow).catch(console.log);
 
+app.on('browser-window-focus', (event, win) => {
+  console.log('browser-window-focus', win.webContents.id);
+});
+
 app.on('activate', () => {
+  console.log('Activated window');
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (mainWindow === null) createWindow();
