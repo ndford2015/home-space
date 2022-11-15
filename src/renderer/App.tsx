@@ -120,7 +120,7 @@ const HomeSpace = () => {
         defaultItemMeta[id] = {
           type: ItemType.NOTE,
           name: nameNoExt,
-          data: data.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''),
+          data: data.replace(/[\u200B-\u200D\uFEFF]/g, ''),
           id: item.id,
         };
         updatedLayout.push({
@@ -163,7 +163,6 @@ const HomeSpace = () => {
   });
 
   const setItemName = (newName: string, id: string) => {
-    console.log('new name: ', newName);
     if (!newName) {
       return;
     }
@@ -188,6 +187,7 @@ const HomeSpace = () => {
     if (!name) {
       return;
     }
+    console.log('val in note: ', val);
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
@@ -197,6 +197,7 @@ const HomeSpace = () => {
         return (
           <Note
             defaultVal={itemMeta[id].data}
+            tags={['general notes', 'interviews']}
             onChange={(val: string) => saveNote(id, val)}
           />
         );

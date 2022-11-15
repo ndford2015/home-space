@@ -248,9 +248,10 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
-  const sqlCb = (err: Error) => {
+  const sqlCb = (res: sqlite.RunResult, err: Error) => {
+    console.log('res: ', res);
     if (err) {
-      throw err;
+      console.error(err);
     }
   };
 
@@ -272,12 +273,19 @@ const createWindow = async () => {
       properties: ['openDirectory'],
     });
     const homeSpaceDir: string = getPathString(selectedDir);
+    console.log('selectedDIr: ', homeSpaceDir);
     // Create setting for user selected home path
-    db.run(`INSERT INTO settings(id, value) VALUES(?, ?)`, [
-      DEFAULT_DIR_ID,
-      homeSpaceDir,
-      sqlCb,
-    ]);
+    try {
+      console.log('running query');
+      db.run(
+        'INSERT INTO settings (id, value) VALUES (?, ?)',
+        [DEFAULT_DIR_ID, homeSpaceDir],
+        sqlCb
+      );
+      console.log('ran query');
+    } catch (e) {
+      console.error('err: ', e);
+    }
     if (!existsSync(homeSpaceDir)) {
       mkdirSync(homeSpaceDir);
     }
@@ -292,8 +300,10 @@ const createWindow = async () => {
         // Get the default directory to store user files if it has been set
         db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
           if (err) {
+            console.log(err);
             throw err;
           }
+          console.log('default dir?: ', defaultDir);
           if (defaultDir) {
             resolve(defaultDir.value);
             return;
