@@ -1,21 +1,29 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
-import React, { useState, useCallback } from 'react';
+import React, {
+  useState,
+  useCallback,
+  FormEvent,
+  MouseEventHandler,
+} from 'react';
 import RichTextEditor from 'react-rte';
 import { EditorState } from 'draft-js';
 import { stateFromMarkdown } from 'draft-js-import-markdown';
 import { FaTag, FaPlus } from 'react-icons/fa';
+import { ItemMeta } from 'renderer/interfaces';
 import { debounce } from '../utils';
 import './item.global.scss';
 
 interface NoteItemProps {
   onChange(val: string): void;
-  defaultVal: string;
-  tags: string[];
+  createTag(tag: string): void;
+  itemMeta: ItemMeta;
+  tags: { id: string; name: string }[];
 }
+
 const Note = (props: NoteItemProps) => {
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
-
+  const [tagFilter, setTagFilter] = useState('');
   const createFromString = (markup: string, format: string, options?) => {
     const contentState = stateFromMarkdown(markup, options);
     const editorState = EditorState.createWithContent(
@@ -29,35 +37,57 @@ const Note = (props: NoteItemProps) => {
     setTagDropdownOpen(!tagDropdownOpen);
   };
 
-  const createTag = (tagName: string) => {};
+  const createTag = (event: MouseEventHandler<HTMLDivElement>) => {
+    props.createTag(tagFilter);
+    setTagFilter('');
+    setTagDropdownOpen(false);
+  };
 
   const addTagButton = (
     _setCustomControlState: (key: string, value: string) => void,
     _getCustomControlState: (key: string) => string,
     _editorState: EditorState
   ) => {
+    const filteredTags: { id: string; name: string }[] = props.tags.filter(
+      (tag) => tag.name.includes(tagFilter)
+    );
     return (
-      <div className="custom-control" onClick={toggleTagDropdown}>
-        <FaTag />
+      <div className="custom-control">
+        <FaTag onClick={toggleTagDropdown} />
         {tagDropdownOpen && (
           <div className="tag-list">
-            <div>
-              <FaPlus />
-              <span>Add New</span>
-            </div>
-            {props.tags.map((tag) => (
-              <div key={tag}>{tag}</div>
-            ))}
+            <input
+              type="text"
+              onChange={(e) => setTagFilter(e.target.value)}
+              name="tagName"
+              placeholder="Search or create tags ..."
+            />
+
+            {filteredTags.length > 0 ? (
+              filteredTags.map((tag) => <div key={tag.id}>{tag.name}</div>)
+            ) : (
+              <div onClick={createTag}>{`Create tag '${tagFilter}'`}</div>
+            )}
           </div>
         )}
       </div>
     );
   };
 
+  const addNoteTags = (
+    _setCustomControlState: (key: string, value: string) => void,
+    _getCustomControlState: (key: string) => string,
+    _editorState: EditorState
+  ) => {
+    return props.itemMeta.tags.map((id: string) => (
+      <div key={id}>{props.tags.find((tag) => tag.id === id)?.name}</div>
+    ));
+  };
+
   const setDefaultVal = () => {
-    const { defaultVal } = props;
-    return defaultVal
-      ? createFromString(defaultVal, 'markdown')
+    const { data } = props.itemMeta;
+    return data
+      ? createFromString(data, 'markdown')
       : RichTextEditor.createEmptyValue();
   };
 
@@ -78,7 +108,7 @@ const Note = (props: NoteItemProps) => {
 
   return (
     <RichTextEditor
-      customControls={[addTagButton]}
+      customControls={[addTagButton, addNoteTags]}
       autoFocus
       className="notepad-container"
       value={value}

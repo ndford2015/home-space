@@ -26,7 +26,14 @@
   overflow-y: auto;
   overflow-x: hidden;
   width: 150px;
-  & > div {
+  & > input {
+    border: 0px;
+    &:focus {
+      outline: none;
+    }
+  }
+  & > div,
+  & > input {
     padding: 8px;
 
     background-color: white;

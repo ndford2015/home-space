@@ -7,13 +7,7 @@ import Menu from './menu/menu';
 import './App.global.scss';
 import { ItemType } from './constants';
 import Note from './home-items/note';
-
-interface ItemMeta {
-  readonly type: ItemType;
-  readonly name: string;
-  readonly data: string;
-  readonly id?: string;
-}
+import { ItemMeta } from './interfaces';
 
 declare global {
   interface Window {
@@ -34,6 +28,7 @@ const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
 const HomeSpace = () => {
   const [layout, setLayout] = useState<Layout[]>([]);
   const [itemMeta, setItemMeta] = useState<{ [id: string]: ItemMeta }>({});
+  const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
 
   const getXVal = (updatedLayout: Layout[]) => {
     if (!updatedLayout.length) {
@@ -49,7 +44,7 @@ const HomeSpace = () => {
     const id: string = uuidv4();
     setItemMeta({
       ...itemMeta,
-      [id]: { type, name: name || '', data: data || '' },
+      [id]: { type, name: name || '', data: data || '', tags: [] },
     });
     setLayout([
       ...layout,
@@ -66,7 +61,8 @@ const HomeSpace = () => {
   };
 
   const loadHome = (
-    defaultItems: { name: string; data: string; id: string }[]
+    defaultItems: { name: string; data: string; id: string; tags: string[] }[],
+    defaultTags: { id: string; name: string }[]
   ) => {
     if (defaultItems) {
       const defaultLayout: Layout[] = [];
@@ -80,6 +76,7 @@ const HomeSpace = () => {
           name: nameNoExt,
           data,
           id: item.id,
+          tags: item.tags || [],
         };
         defaultLayout.push({
           i: id,
@@ -93,6 +90,7 @@ const HomeSpace = () => {
       });
       setItemMeta(defaultItemMeta);
       setLayout(defaultLayout);
+      setTags(defaultTags);
     }
   };
 
@@ -122,6 +120,7 @@ const HomeSpace = () => {
           name: nameNoExt,
           data: data.replace(/[\u200B-\u200D\uFEFF]/g, ''),
           id: item.id,
+          tags: [],
         };
         updatedLayout.push({
           i: id,
@@ -142,6 +141,25 @@ const HomeSpace = () => {
     window.electron.ipcRenderer.on('openFiles', openFiles);
     return () => {
       window.electron.ipcRenderer.removeAllListeners('openFiles');
+    };
+  });
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'tagCreated',
+      (tag: { id: string; name: string }, fileId: string) => {
+        setTags([...tags, tag]);
+        setItemMeta({
+          ...itemMeta,
+          [fileId]: {
+            ...itemMeta[fileId],
+            tags: [...itemMeta[fileId].tags, tag.id],
+          },
+        });
+      }
+    );
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('tagCreated');
     };
   });
 
@@ -191,13 +209,23 @@ const HomeSpace = () => {
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
+  const createTag = (tagName: string, id: string) => {
+    const { name } = itemMeta[id];
+    window.electron.ipcRenderer.send('createTag', {
+      tagName,
+      fileName: name,
+      fileId: id,
+    });
+  };
+
   const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
         return (
           <Note
-            defaultVal={itemMeta[id].data}
-            tags={['general notes', 'interviews']}
+            itemMeta={itemMeta[id]}
+            tags={tags}
+            createTag={(tagName: string) => createTag(tagName, id)}
             onChange={(val: string) => saveNote(id, val)}
           />
         );

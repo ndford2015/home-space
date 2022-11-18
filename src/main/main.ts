@@ -28,6 +28,7 @@ import {
   readdir,
   stat,
   Dirent,
+  realpath,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -90,6 +91,33 @@ const getParentDirPath = (filePath: string) => {
   return filePath.replace(/[^\\/]*$/, '').slice(0, -1);
 };
 
+// we have the filename
+// we know that the file is in today's directory
+// we need the original filepath
+ipcMain.on('createTag', (_event, { tagName, fileName, fileId }) => {
+  const tagDir = `${getParentDirPath(todayDir)}/tags/${tagName}`;
+  if (!existsSync(tagDir)) {
+    mkdirSync(tagDir);
+  }
+  const tagId = getFileId(statSync(tagDir));
+  realpath(`${todayDir}/${fileName}.md`, (error, resolvedPath) => {
+    if (error) {
+      console.log(error);
+    } else {
+      link(resolvedPath, `${tagDir}/${fileName}.md`, () => {});
+      if (!mainWindow) {
+        throw new Error('"mainWindow" is not defined');
+      }
+      mainWindow.webContents.send(
+        'tagCreated',
+        { id: tagId, name: tagName },
+        fileId
+      );
+    }
+  });
+});
+
+// TODO: apply tags when opening file
 ipcMain.on('open', () => {
   db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
     if (err) {
@@ -174,7 +202,7 @@ const populateFilesTagMappings = (
 
 const getFileTags = async () => {
   const tagDir = `${getParentDirPath(todayDir)}/tags`;
-  const fileTags = {};
+  const fileTags: { [fileId: string]: string[] } = {};
   const allTags: { id: string; name: string }[] = [];
   // TODO: swap with async calls for performance improvement
   const tags: Dirent[] = readdirSync(tagDir, { withFileTypes: true }).filter(
@@ -215,7 +243,7 @@ const loadHome = async () => {
   });
   if (mainWindow) {
     console.log('fileMeta: ', fileMeta);
-    mainWindow.webContents.send('loadHome', fileMeta);
+    mainWindow.webContents.send('loadHome', fileMeta, tags ? tags.allTags : []);
   }
 };
 
