@@ -5,6 +5,8 @@ import React, {
   useCallback,
   FormEvent,
   MouseEventHandler,
+  useEffect,
+  useRef,
 } from 'react';
 import RichTextEditor from 'react-rte';
 import { EditorState } from 'draft-js';
@@ -33,14 +35,45 @@ const Note = (props: NoteItemProps) => {
     return new RichTextEditor.EditorValue(editorState, { [format]: markup });
   };
 
+  function useCloseTagDropdown(ref) {
+    useEffect(() => {
+      /**
+       * Alert if clicked on outside of element
+       */
+      function handleClickOutside(this: Document, event: MouseEvent) {
+        if (ref.current && !ref.current.contains(event.target)) {
+          console.log(event);
+          console.log('closing');
+          setTagDropdownOpen(false);
+        }
+      }
+      // Bind the event listener
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        // Unbind the event listener on clean up
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, [ref]);
+  }
+
+  const wrapperRef = useRef(null);
+  useCloseTagDropdown(wrapperRef);
+
   const toggleTagDropdown = () => {
+    console.log('toggling');
     setTagDropdownOpen(!tagDropdownOpen);
   };
 
-  const createTag = (event: MouseEventHandler<HTMLDivElement>) => {
-    props.createTag(tagFilter);
+  const addTagToNote = (name: string) => {
+    props.createTag(name);
+    console.log('clearing tag filter');
     setTagFilter('');
-    setTagDropdownOpen(false);
+  };
+
+  const tagFilterChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    console.log('setting tag filter: ', e.target.value);
+    setTagFilter(e.target.value);
   };
 
   const tagToolbar = (
@@ -48,39 +81,63 @@ const Note = (props: NoteItemProps) => {
     _getCustomControlState: (key: string) => string,
     _editorState: EditorState
   ) => {
+    console.log('rerender the tagToolbar');
     const filteredTags: { id: string; name: string }[] = props.tags.filter(
-      (tag) => tag.name.includes(tagFilter)
+      (tag) =>
+        tag.name.includes(tagFilter) && !props.itemMeta.tags.includes(tag.id)
     );
+
     return (
       <div className="tag-toolbar">
-        <div className="custom-control">
-          <FaTag onClick={toggleTagDropdown} />
-          {tagDropdownOpen && (
+        <div onClick={toggleTagDropdown} className="tag-btn">
+          <FaTag className="tag-btn-icon" />
+        </div>
+        {tagDropdownOpen && (
+          <div className="tags-container" ref={wrapperRef}>
             <div className="tag-list">
+              <span className="available-tags">Available Tags</span>
               <input
                 type="text"
-                onChange={(e) => setTagFilter(e.target.value)}
+                onChange={tagFilterChanged}
+                value={tagFilter}
                 name="tagName"
-                placeholder="Search or create tags ..."
+                placeholder="Search or create tag"
               />
-
-              {filteredTags.length > 0 ? (
-                filteredTags.map((tag) => <div key={tag.id}>{tag.name}</div>)
-              ) : (
-                <div onClick={createTag}>{`Create tag '${tagFilter}'`}</div>
+              {!!(
+                tagFilter.length &&
+                !filteredTags.find((tag) => tag.name === tagFilter)
+              ) && (
+                <div
+                  onClick={() => addTagToNote(tagFilter)}
+                >{`Create tag '${tagFilter}'`}</div>
               )}
+              {filteredTags.map((tag) => (
+                <div onClick={() => addTagToNote(tag.name)} key={tag.id}>
+                  {tag.name}
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-        <div className="note-tags">
-          {props.itemMeta.tags.map((id: string) => {
-            return (
-              <div key={id}>
-                {props.tags.find((tag) => tag.id === id)?.name}
+            <div className="note-tags-container">
+              <span className="note-tags-header">{`${props.itemMeta.name}'s Tags`}</span>
+              <div className="note-tags">
+                {props.itemMeta.tags.length ? (
+                  props.itemMeta.tags.map((id: string) => {
+                    return (
+                      <div key={id}>
+                        {props.tags.find((tag) => tag.id === id)?.name}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <span className="no-tags-msg">
+                    Start typing or select a tag from the list to add to this
+                    note
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

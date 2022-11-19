@@ -1,4 +1,4 @@
-.custom-control {
+.tag-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7,7 +7,7 @@
   border: 1px solid #999;
   padding: 3px;
   margin-right: 10px;
-  position: relative;
+  z-index: 10;
   &:hover {
     cursor: pointer;
   }
@@ -16,57 +16,73 @@
 .note-tags {
   display: flex;
   flex-direction: row;
-  width: 70%;
+  max-width: 250px;
   position: relative;
   flex-wrap: wrap;
+  height: fit-content;
+  justify-content: flex-start;
   padding-bottom: 10px;
-  & > div:nth-child(n + 5) {
-    display: none;
-  }
-  &:hover > :nth-child(n + 5) {
-    display: inline;
-    margin-top: 5px;
-  }
-  & > :nth-child(4)::after {
-    content: '⌄';
-    right: -5px;
-    font-size: 25px;
-    bottom: -7px;
-    left: 50%;
-    position: absolute;
-  }
-  &:hover > :nth-child(4)::after {
-    display: none;
-  }
+  padding-right: 10px;
   & > div {
     padding: 5px;
     border: 1px solid #999;
-    box-shadow: 0px 2px 18px 0px lightgrey;
+    margin-top: 10px;
+    box-shadow: inset -10px -5px 18px 0px #a9940038;
     border-radius: 3px;
-    margin-left: 5px;
+    margin-left: 10px;
     width: fit-content;
+    height: fit-content;
     white-space: nowrap;
     background-color: cornsilk;
   }
+}
+
+.note-tags-container {
+  display: flex;
+  border: 1px solid #999;
+  flex-direction: column;
+  background-color: white;
+  margin-left: 20px;
+  box-shadow: 0px 2px 18px 0px lightgrey;
+  border-radius: 5px;
+  height: fit-content;
+}
+
+.available-tags,
+.note-tags-header {
+  padding: 10px;
+  background-color: rgb(64, 64, 64);
+  font-weight: bold;
+  color: white;
+  border-bottom: 3px solid #999;
+}
+
+.tags-container {
+  position: absolute;
+  top: 40px;
+  left: 0px;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  flex-direction: row;
+  z-index: 10;
 }
 
 .tag-toolbar {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
+  position: relative;
 }
 
 .tag-list {
-  position: absolute;
-  top: 35px;
-  left: 0px;
+  height: fit-content;
   display: flex;
-  justify-content: space-evenly;
+  max-height: 300px;
   flex-direction: column;
   box-shadow: 0px 2px 4px 0px lightgrey;
   border: 1px solid #999;
   border-radius: 5px;
-  z-index: 10;
   overflow-y: auto;
   overflow-x: hidden;
   width: 150px;
