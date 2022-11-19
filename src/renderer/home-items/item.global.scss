@@ -6,10 +6,54 @@
   height: 22px;
   border: 1px solid #999;
   padding: 3px;
+  margin-right: 10px;
   position: relative;
   &:hover {
     cursor: pointer;
   }
+}
+
+.note-tags {
+  display: flex;
+  flex-direction: row;
+  width: 70%;
+  position: relative;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  & > div:nth-child(n + 5) {
+    display: none;
+  }
+  &:hover > :nth-child(n + 5) {
+    display: inline;
+    margin-top: 5px;
+  }
+  & > :nth-child(4)::after {
+    content: '⌄';
+    right: -5px;
+    font-size: 25px;
+    bottom: -7px;
+    left: 50%;
+    position: absolute;
+  }
+  &:hover > :nth-child(4)::after {
+    display: none;
+  }
+  & > div {
+    padding: 5px;
+    border: 1px solid #999;
+    box-shadow: 0px 2px 18px 0px lightgrey;
+    border-radius: 3px;
+    margin-left: 5px;
+    width: fit-content;
+    white-space: nowrap;
+    background-color: cornsilk;
+  }
+}
+
+.tag-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
 }
 
 .tag-list {

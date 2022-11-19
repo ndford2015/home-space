@@ -43,7 +43,7 @@ const Note = (props: NoteItemProps) => {
     setTagDropdownOpen(false);
   };
 
-  const addTagButton = (
+  const tagToolbar = (
     _setCustomControlState: (key: string, value: string) => void,
     _getCustomControlState: (key: string) => string,
     _editorState: EditorState
@@ -52,36 +52,37 @@ const Note = (props: NoteItemProps) => {
       (tag) => tag.name.includes(tagFilter)
     );
     return (
-      <div className="custom-control">
-        <FaTag onClick={toggleTagDropdown} />
-        {tagDropdownOpen && (
-          <div className="tag-list">
-            <input
-              type="text"
-              onChange={(e) => setTagFilter(e.target.value)}
-              name="tagName"
-              placeholder="Search or create tags ..."
-            />
+      <div className="tag-toolbar">
+        <div className="custom-control">
+          <FaTag onClick={toggleTagDropdown} />
+          {tagDropdownOpen && (
+            <div className="tag-list">
+              <input
+                type="text"
+                onChange={(e) => setTagFilter(e.target.value)}
+                name="tagName"
+                placeholder="Search or create tags ..."
+              />
 
-            {filteredTags.length > 0 ? (
-              filteredTags.map((tag) => <div key={tag.id}>{tag.name}</div>)
-            ) : (
-              <div onClick={createTag}>{`Create tag '${tagFilter}'`}</div>
-            )}
-          </div>
-        )}
+              {filteredTags.length > 0 ? (
+                filteredTags.map((tag) => <div key={tag.id}>{tag.name}</div>)
+              ) : (
+                <div onClick={createTag}>{`Create tag '${tagFilter}'`}</div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="note-tags">
+          {props.itemMeta.tags.map((id: string) => {
+            return (
+              <div key={id}>
+                {props.tags.find((tag) => tag.id === id)?.name}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
-  };
-
-  const addNoteTags = (
-    _setCustomControlState: (key: string, value: string) => void,
-    _getCustomControlState: (key: string) => string,
-    _editorState: EditorState
-  ) => {
-    return props.itemMeta.tags.map((id: string) => (
-      <div key={id}>{props.tags.find((tag) => tag.id === id)?.name}</div>
-    ));
   };
 
   const setDefaultVal = () => {
@@ -108,7 +109,7 @@ const Note = (props: NoteItemProps) => {
 
   return (
     <RichTextEditor
-      customControls={[addTagButton, addNoteTags]}
+      customControls={[tagToolbar]}
       autoFocus
       className="notepad-container"
       value={value}
