@@ -369,8 +369,12 @@ const createWindow = async () => {
         const defaultDir = await initializeDefaultDir();
         const date: string = new Date().toISOString().split('T')[0];
         todayDir = `${defaultDir}/${date}`;
+        const tagDir = `${defaultDir}/tags`;
         if (!existsSync(todayDir)) {
           mkdirSync(todayDir);
+        }
+        if (!existsSync(tagDir)) {
+          mkdirSync(tagDir);
         }
         loadHome();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
