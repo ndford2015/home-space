@@ -4268,7 +4268,7 @@ draft-js-export-html@>=0.6.0:
   dependencies:
     draft-js-utils "^1.4.0"
 
-draft-js-export-markdown@>=0.3.0:
+draft-js-export-markdown@>=0.3.0, draft-js-export-markdown@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/draft-js-export-markdown/-/draft-js-export-markdown-1.4.0.tgz#783731a0aaba4a5962d1d6a37293df7926ea6e45"
   integrity sha512-blfAvlhGhjVlHNaZ5WJKlrXhcftnwwC5VC+Eu3ztOGpGLaOom4hxhBjbKEWjvbQZJ9zL+xo57ukm39prYZMG5Q==
@@ -4290,7 +4290,7 @@ draft-js-import-html@>=0.4.0:
   dependencies:
     draft-js-import-element "^1.4.0"
 
-draft-js-import-markdown@>=0.3.0:
+draft-js-import-markdown@>=0.3.0, draft-js-import-markdown@^1.4.1:
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/draft-js-import-markdown/-/draft-js-import-markdown-1.4.1.tgz#fbd4c15fbf81a119d2d40c028e5195e4f01cc804"
   integrity sha512-58mDXJURrb5dsiN+cIms/gojI9jngE60WAwygYoxrEbsQeIIITOlFLjV/m/7Ko7HVpc5wjngVV2hzJ71T3FpMA==
@@ -4303,7 +4303,7 @@ draft-js-utils@>=0.2.0, draft-js-utils@^1.4.0:
   resolved "https://registry.yarnpkg.com/draft-js-utils/-/draft-js-utils-1.4.1.tgz#a59c792ad621f7050292031a237d524708a6d509"
   integrity sha512-xE81Y+z/muC5D5z9qWmKfxEW1XyXfsBzSbSBk2JRsoD0yzMGGHQm/0MtuqHl/EUDkaBJJLjJ2EACycoDMY/OOg==
 
-draft-js@>=0.10.0:
+draft-js@>=0.10.0, draft-js@^0.11.7:
   version "0.11.7"
   resolved "https://registry.yarnpkg.com/draft-js/-/draft-js-0.11.7.tgz#be293aaa255c46d8a6647f3860aa4c178484a206"
   integrity sha512-ne7yFfN4sEL82QPQEn80xnADR8/Q6ALVworbC5UOSzOvjffmYfFsr3xSZtxbIirti14R7Y33EZC5rivpLgIbsg==

@@ -67,6 +67,9 @@
     background-color: mistyrose;
   }
   span {
+    &::-webkit-scrollbar {
+      display: none;
+    }
     border: none;
     height: 30px;
     font-size: 25px;

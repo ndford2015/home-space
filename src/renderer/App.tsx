@@ -7,13 +7,7 @@ import Menu from './menu/menu';
 import './App.global.scss';
 import { ItemType } from './constants';
 import Note from './home-items/note';
-
-interface ItemMeta {
-  readonly type: ItemType;
-  readonly name: string;
-  readonly data: string;
-  readonly id?: string;
-}
+import { ItemMeta } from './interfaces';
 
 declare global {
   interface Window {
@@ -34,6 +28,7 @@ const ReactGridLayout: React.ComponentClass<GridLayout.ReactGridLayoutProps> =
 const HomeSpace = () => {
   const [layout, setLayout] = useState<Layout[]>([]);
   const [itemMeta, setItemMeta] = useState<{ [id: string]: ItemMeta }>({});
+  const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
 
   const getXVal = (updatedLayout: Layout[]) => {
     if (!updatedLayout.length) {
@@ -49,7 +44,7 @@ const HomeSpace = () => {
     const id: string = uuidv4();
     setItemMeta({
       ...itemMeta,
-      [id]: { type, name: name || '', data: data || '' },
+      [id]: { type, name: name || '', data: data || '', tags: [] },
     });
     setLayout([
       ...layout,
@@ -66,7 +61,8 @@ const HomeSpace = () => {
   };
 
   const loadHome = (
-    defaultItems: { name: string; data: string; id: string }[]
+    defaultItems: { name: string; data: string; id: string; tags: string[] }[],
+    defaultTags: { id: string; name: string }[]
   ) => {
     if (defaultItems) {
       const defaultLayout: Layout[] = [];
@@ -80,6 +76,7 @@ const HomeSpace = () => {
           name: nameNoExt,
           data,
           id: item.id,
+          tags: item.tags || [],
         };
         defaultLayout.push({
           i: id,
@@ -93,6 +90,7 @@ const HomeSpace = () => {
       });
       setItemMeta(defaultItemMeta);
       setLayout(defaultLayout);
+      setTags(defaultTags);
     }
   };
 
@@ -120,8 +118,9 @@ const HomeSpace = () => {
         defaultItemMeta[id] = {
           type: ItemType.NOTE,
           name: nameNoExt,
-          data: data.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''),
+          data: data.replace(/[\u200B-\u200D\uFEFF]/g, ''),
           id: item.id,
+          tags: [],
         };
         updatedLayout.push({
           i: id,
@@ -145,6 +144,48 @@ const HomeSpace = () => {
     };
   });
 
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'fileTagged',
+      (tag: { id: string; name: string }, fileId: string, created: boolean) => {
+        if (created) {
+          setTags([...tags, tag]);
+        }
+        setItemMeta({
+          ...itemMeta,
+          [fileId]: {
+            ...itemMeta[fileId],
+            tags: [...itemMeta[fileId].tags, tag.id],
+          },
+        });
+      }
+    );
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('fileTagged');
+    };
+  });
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'fileTagRemoved',
+      (removedTagId: string, fileId: string) => {
+        console.log('removing tag: ', removedTagId, ' from file: ', fileId);
+        setItemMeta({
+          ...itemMeta,
+          [fileId]: {
+            ...itemMeta[fileId],
+            tags: itemMeta[fileId].tags.filter(
+              (tagId) => tagId !== removedTagId
+            ),
+          },
+        });
+      }
+    );
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('fileTagRemoved');
+    };
+  });
+
   const fileSaved = (fileMeta: { id: string; layoutId: string }) => {
     setItemMeta({
       ...itemMeta,
@@ -163,7 +204,6 @@ const HomeSpace = () => {
   });
 
   const setItemName = (newName: string, id: string) => {
-    console.log('new name: ', newName);
     if (!newName) {
       return;
     }
@@ -191,13 +231,41 @@ const HomeSpace = () => {
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
+  const createTag = (tagName: string, id: string) => {
+    const { name } = itemMeta[id];
+    window.electron.ipcRenderer.send('createTag', {
+      tagName,
+      fileName: name,
+      fileId: id,
+    });
+  };
+
+  const removeFileTag = (tagId: string, id: string) => {
+    const { name } = itemMeta[id];
+    const tagName: string | undefined = tags.find(
+      (tag) => tag.id === tagId
+    )?.name;
+    if (!tagName) {
+      return;
+    }
+    window.electron.ipcRenderer.send('removeFileTag', {
+      tagName,
+      fileName: name,
+      fileId: id,
+      tagId,
+    });
+  };
+
   const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
         return (
           <Note
-            defaultVal={itemMeta[id].data}
+            itemMeta={itemMeta[id]}
+            tags={tags}
+            createTag={(tagName: string) => createTag(tagName, id)}
             onChange={(val: string) => saveNote(id, val)}
+            removeFileTag={(tagId: string) => removeFileTag(tagId, id)}
           />
         );
       default:
