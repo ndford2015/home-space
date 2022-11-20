@@ -146,9 +146,11 @@ const HomeSpace = () => {
 
   useEffect(() => {
     window.electron.ipcRenderer.on(
-      'tagCreated',
-      (tag: { id: string; name: string }, fileId: string) => {
-        setTags([...tags, tag]);
+      'fileTagged',
+      (tag: { id: string; name: string }, fileId: string, created: boolean) => {
+        if (created) {
+          setTags([...tags, tag]);
+        }
         setItemMeta({
           ...itemMeta,
           [fileId]: {
@@ -159,7 +161,28 @@ const HomeSpace = () => {
       }
     );
     return () => {
-      window.electron.ipcRenderer.removeAllListeners('tagCreated');
+      window.electron.ipcRenderer.removeAllListeners('fileTagged');
+    };
+  });
+
+  useEffect(() => {
+    window.electron.ipcRenderer.on(
+      'fileTagRemoved',
+      (removedTagId: string, fileId: string) => {
+        console.log('removing tag: ', removedTagId, ' from file: ', fileId);
+        setItemMeta({
+          ...itemMeta,
+          [fileId]: {
+            ...itemMeta[fileId],
+            tags: itemMeta[fileId].tags.filter(
+              (tagId) => tagId !== removedTagId
+            ),
+          },
+        });
+      }
+    );
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('fileTagRemoved');
     };
   });
 
@@ -205,7 +228,6 @@ const HomeSpace = () => {
     if (!name) {
       return;
     }
-    console.log('val in note: ', val);
     window.electron.ipcRenderer.send('noteUpdate', { name, val });
   };
 
@@ -218,6 +240,22 @@ const HomeSpace = () => {
     });
   };
 
+  const removeFileTag = (tagId: string, id: string) => {
+    const { name } = itemMeta[id];
+    const tagName: string | undefined = tags.find(
+      (tag) => tag.id === tagId
+    )?.name;
+    if (!tagName) {
+      return;
+    }
+    window.electron.ipcRenderer.send('removeFileTag', {
+      tagName,
+      fileName: name,
+      fileId: id,
+      tagId,
+    });
+  };
+
   const getItemByType = (type: ItemType, id: string): JSX.Element | null => {
     switch (type) {
       case ItemType.NOTE:
@@ -227,6 +265,7 @@ const HomeSpace = () => {
             tags={tags}
             createTag={(tagName: string) => createTag(tagName, id)}
             onChange={(val: string) => saveNote(id, val)}
+            removeFileTag={(tagId: string) => removeFileTag(tagId, id)}
           />
         );
       default:

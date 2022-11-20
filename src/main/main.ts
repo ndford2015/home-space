@@ -29,6 +29,7 @@ import {
   stat,
   Dirent,
   realpath,
+  unlink,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -52,11 +53,9 @@ const CREATE_SETTINGS_SQL =
   'CREATE TABLE if not exists settings (id TEXT, value TEXT)';
 
 ipcMain.on('noteUpdate', (_event, arg) => {
-  console.log('note name: ', arg.name);
   const filepath = `${todayDir}/${arg.name}.md`;
   writeFile(filepath, arg.val, (err) => {
     if (err) throw err;
-    console.log('The file has been saved!');
   });
 });
 
@@ -78,7 +77,6 @@ ipcMain.on('rename', (_event, arg) => {
   } else {
     rename(oldPath, newPath, (err) => {
       if (err) throw err;
-      console.log('The file has been renamed to ', newPath);
     });
   }
 });
@@ -91,13 +89,12 @@ const getParentDirPath = (filePath: string) => {
   return filePath.replace(/[^\\/]*$/, '').slice(0, -1);
 };
 
-// we have the filename
-// we know that the file is in today's directory
-// we need the original filepath
 ipcMain.on('createTag', (_event, { tagName, fileName, fileId }) => {
   const tagDir = `${getParentDirPath(todayDir)}/tags/${tagName}`;
+  let created = false;
   if (!existsSync(tagDir)) {
     mkdirSync(tagDir);
+    created = true;
   }
   const tagId = getFileId(statSync(tagDir));
   realpath(`${todayDir}/${fileName}.md`, (error, resolvedPath) => {
@@ -109,12 +106,30 @@ ipcMain.on('createTag', (_event, { tagName, fileName, fileId }) => {
         throw new Error('"mainWindow" is not defined');
       }
       mainWindow.webContents.send(
-        'tagCreated',
+        'fileTagged',
         { id: tagId, name: tagName },
-        fileId
+        fileId,
+        created
       );
     }
   });
+});
+
+ipcMain.on('removeFileTag', (_event, { tagName, fileName, fileId, tagId }) => {
+  unlink(
+    `${getParentDirPath(todayDir)}/tags/${tagName}/${fileName}.md`,
+    (err) => {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(`Unlinked file: ${fileName} from tag: ${tagName}`);
+        if (!mainWindow) {
+          throw new Error('"mainWindow" is not defined');
+        }
+        mainWindow.webContents.send('fileTagRemoved', tagId, fileId);
+      }
+    }
+  );
 });
 
 // TODO: apply tags when opening file
@@ -141,7 +156,6 @@ ipcMain.on('open', () => {
         const data = readFileSync(filePath);
         const filename: string = filePath.replace(/^.*[\\/]/, '');
         const dirPath: string = getParentDirPath(filePath);
-        console.log('filepath:', dirPath, 'todayDir:', todayDir);
         if (dirPath !== todayDir) {
           link(filePath, `${todayDir}/${filename}`, () => {});
         }
@@ -152,7 +166,6 @@ ipcMain.on('open', () => {
           id: `${stats.dev}-${stats.ino}`,
         });
       });
-      console.log('filemeta:', fileMeta);
       mainWindow.webContents.send('openFiles', fileMeta);
     }
   });
@@ -179,7 +192,6 @@ const populateFilesTagMappings = (
   const files: Dirent[] = readdirSync(tagPath, { withFileTypes: true });
   // eslint-disable-next-line array-callback-return
   files.forEach((file: Dirent) => {
-    console.log('file:', file.name, 'tag: ', tagPath);
     const filePath = `${tagPath}/${file.name}`;
     promises.push(
       new Promise<void>((resolve, reject) => {
@@ -187,11 +199,9 @@ const populateFilesTagMappings = (
           const fileId = getFileId(stats);
           if (!fileTags[fileId]) {
             fileTags[fileId] = [tagId];
-            console.log('fileTags:', fileTags);
             resolve();
           } else {
             fileTags[fileId].push(tagId);
-            console.log('fileTags:', fileTags);
             resolve();
           }
         });
@@ -228,7 +238,6 @@ const loadHome = async () => {
     (item) => !/(^|\/)\.[^/.]/g.test(item)
   );
   const tags = await getFileTags();
-  console.log('filetags: ', tags);
   files.forEach((file) => {
     const filePath = `${todayDir}/${file}`;
     const data = readFileSync(filePath);
@@ -242,7 +251,6 @@ const loadHome = async () => {
     });
   });
   if (mainWindow) {
-    console.log('fileMeta: ', fileMeta);
     mainWindow.webContents.send('loadHome', fileMeta, tags ? tags.allTags : []);
   }
 };
@@ -277,7 +285,6 @@ const createWindow = async () => {
   };
 
   const sqlCb = (res: sqlite.RunResult, err: Error) => {
-    console.log('res: ', res);
     if (err) {
       console.error(err);
     }
@@ -301,16 +308,13 @@ const createWindow = async () => {
       properties: ['openDirectory'],
     });
     const homeSpaceDir: string = getPathString(selectedDir);
-    console.log('selectedDIr: ', homeSpaceDir);
     // Create setting for user selected home path
     try {
-      console.log('running query');
       db.run(
         'INSERT INTO settings (id, value) VALUES (?, ?)',
         [DEFAULT_DIR_ID, homeSpaceDir],
         sqlCb
       );
-      console.log('ran query');
     } catch (e) {
       console.error('err: ', e);
     }
@@ -331,7 +335,6 @@ const createWindow = async () => {
             console.log(err);
             throw err;
           }
-          console.log('default dir?: ', defaultDir);
           if (defaultDir) {
             resolve(defaultDir.value);
             return;
@@ -368,9 +371,8 @@ const createWindow = async () => {
         todayDir = `${defaultDir}/${date}`;
         if (!existsSync(todayDir)) {
           mkdirSync(todayDir);
-        } else {
-          loadHome();
         }
+        loadHome();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         if (e.message) {
@@ -392,8 +394,6 @@ const createWindow = async () => {
     event.preventDefault();
     shell.openExternal(url);
   });
-
-  console.log('user path: ', app.getPath('userData'));
 
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line

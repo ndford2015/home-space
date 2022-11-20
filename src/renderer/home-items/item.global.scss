@@ -17,6 +17,8 @@
   display: flex;
   flex-direction: row;
   max-width: 250px;
+  max-height: 300px;
+  overflow-y: auto;
   position: relative;
   flex-wrap: wrap;
   height: fit-content;
@@ -34,18 +36,49 @@
     height: fit-content;
     white-space: nowrap;
     background-color: cornsilk;
+    display: flex;
+    align-items: center;
+    & > svg {
+      padding-left: 5px;
+      color: rgb(80, 80, 80);
+      &:hover {
+        cursor: pointer;
+        color: black;
+      }
+    }
   }
 }
 
-.note-tags-container {
+.note-tags-container,
+.tag-list-container {
   display: flex;
   border: 1px solid #999;
   flex-direction: column;
   background-color: white;
-  margin-left: 20px;
   box-shadow: 0px 2px 18px 0px lightgrey;
   border-radius: 5px;
   height: fit-content;
+}
+
+.tag-list-container {
+  margin-left: -10px;
+}
+
+.note-tags-container {
+  margin-left: 10px;
+}
+
+.tag-list-container > input {
+  border: 0px;
+  &:focus {
+    outline: none;
+  }
+  padding: 8px;
+
+  background-color: white;
+  & > span {
+    padding-left: 5px;
+  }
 }
 
 .available-tags,
@@ -80,18 +113,8 @@
   display: flex;
   max-height: 300px;
   flex-direction: column;
-  box-shadow: 0px 2px 4px 0px lightgrey;
-  border: 1px solid #999;
-  border-radius: 5px;
   overflow-y: auto;
   overflow-x: hidden;
-  width: 150px;
-  & > input {
-    border: 0px;
-    &:focus {
-      outline: none;
-    }
-  }
   & > div,
   & > input {
     padding: 8px;
