@@ -30,6 +30,7 @@ import {
   Dirent,
   realpath,
   unlink,
+  realpathSync,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -153,13 +154,14 @@ ipcMain.on('open', () => {
       // TODO: deduplicate
       const fileMeta: { name: string; data: string; id: string }[] = [];
       files.filePaths.forEach((filePath) => {
-        const data = readFileSync(filePath);
-        const filename: string = filePath.replace(/^.*[\\/]/, '');
-        const dirPath: string = getParentDirPath(filePath);
+        const resolvedPath: string = realpathSync(filePath);
+        const data = readFileSync(resolvedPath);
+        const filename: string = resolvedPath.replace(/^.*[\\/]/, '');
+        const dirPath: string = getParentDirPath(resolvedPath);
         if (dirPath !== todayDir) {
-          link(filePath, `${todayDir}/${filename}`, () => {});
+          link(resolvedPath, `${todayDir}/${filename}`, () => {});
         }
-        const stats: Stats = statSync(filePath);
+        const stats: Stats = statSync(resolvedPath);
         fileMeta.push({
           name: filename,
           data: data.toString(),
@@ -335,6 +337,7 @@ const createWindow = async () => {
             console.log(err);
             throw err;
           }
+          // TODO: check to make sure directory exists
           if (defaultDir) {
             resolve(defaultDir.value);
             return;
