@@ -390,6 +390,7 @@ const createWindow = async () => {
   // 4. Has been left open, date hasn't changed
   mainWindow.on('focus', async () => {
     try {
+      // TODO: initialize to current timezone using library
       const todayDate: string = new Date().toISOString().split('T')[0];
       // App already open
       if (todayDir && getFileName(todayDir) === todayDate) {
