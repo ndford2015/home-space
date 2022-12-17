@@ -30,6 +30,7 @@ import {
   Dirent,
   realpath,
   unlink,
+  realpathSync,
 } from 'fs';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -133,6 +134,10 @@ ipcMain.on('removeFileTag', (_event, { tagName, fileName, fileId, tagId }) => {
 });
 
 // TODO: apply tags when opening file
+const getFileName = (filePath: string) => {
+  return filePath.replace(/^.*[\\/]/, '');
+};
+
 ipcMain.on('open', () => {
   db.get(DEFAULT_DIR_SQL, [DEFAULT_DIR_ID], async (err, defaultDir) => {
     if (err) {
@@ -153,13 +158,14 @@ ipcMain.on('open', () => {
       // TODO: deduplicate
       const fileMeta: { name: string; data: string; id: string }[] = [];
       files.filePaths.forEach((filePath) => {
-        const data = readFileSync(filePath);
-        const filename: string = filePath.replace(/^.*[\\/]/, '');
-        const dirPath: string = getParentDirPath(filePath);
+        const resolvedPath: string = realpathSync(filePath);
+        const data = readFileSync(resolvedPath);
+        const filename: string = resolvedPath.replace(/^.*[\\/]/, '');
+        const dirPath: string = getParentDirPath(resolvedPath);
         if (dirPath !== todayDir) {
-          link(filePath, `${todayDir}/${filename}`, () => {});
+          link(resolvedPath, `${todayDir}/${filename}`, () => {});
         }
-        const stats: Stats = statSync(filePath);
+        const stats: Stats = statSync(resolvedPath);
         fileMeta.push({
           name: filename,
           data: data.toString(),
@@ -231,7 +237,12 @@ const getFileTags = async () => {
   return { fileTags, allTags };
 };
 
-const loadHome = async () => {
+const loadHome = async (homeDir: string) => {
+  const todayDate: string = new Date().toISOString().split('T')[0];
+  todayDir = `${homeDir}/${todayDate}`;
+  if (!existsSync(todayDir)) {
+    mkdirSync(todayDir);
+  }
   const fileMeta: { name: string; data: string; id: string; tags: string[] }[] =
     [];
   const files: string[] = readdirSync(todayDir).filter(
@@ -335,6 +346,7 @@ const createWindow = async () => {
             console.log(err);
             throw err;
           }
+          // TODO: check to make sure directory exists
           if (defaultDir) {
             resolve(defaultDir.value);
             return;
@@ -365,23 +377,38 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
       mainWindow.focus();
-      try {
-        const defaultDir = await initializeDefaultDir();
-        const date: string = new Date().toISOString().split('T')[0];
-        todayDir = `${defaultDir}/${date}`;
-        const tagDir = `${defaultDir}/tags`;
-        if (!existsSync(todayDir)) {
-          mkdirSync(todayDir);
-        }
-        if (!existsSync(tagDir)) {
-          mkdirSync(tagDir);
-        }
-        loadHome();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
-        if (e.message) {
-          console.error(e.message);
-        }
+    }
+  });
+
+  // cases:
+  // 1. opening for first time today
+  //   a. no today dir, need to create it
+  // 2. Opening after first time today
+  //   a. check if dir exists, create if not. otherwise load home
+  // 3. Has been left open, date changed
+  //   a. create new date folder
+  // 4. Has been left open, date hasn't changed
+  mainWindow.on('focus', async () => {
+    try {
+      // TODO: initialize to current timezone using library
+      const todayDate: string = new Date().toISOString().split('T')[0];
+      // App already open
+      if (todayDir && getFileName(todayDir) === todayDate) {
+        return;
+      }
+      // Opening for the first time
+      const homeDir = todayDir
+        ? getParentDirPath(todayDir)
+        : await initializeDefaultDir();
+      const tagDir = `${homeDir}/tags`;
+      if (!existsSync(tagDir)) {
+        mkdirSync(tagDir);
+      }
+      loadHome(homeDir);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      if (e.message) {
+        console.error(e.message);
       }
     }
   });
